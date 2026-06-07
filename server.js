@@ -15,8 +15,8 @@ const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'kysb_secret';
 const MONGO_URI = process.env.MONGO_URI;
 
-const MAP_W = 2000;
-const MAP_H = 1500;
+const MAP_W = 2400;
+const MAP_H = 1800;
 
 let db;
 MongoClient.connect(MONGO_URI).then(client => {
@@ -43,13 +43,7 @@ app.get('/auth/callback', async (req, res) => {
     if (!code) return res.redirect('/');
     try {
         const tokenRes = await axios.post('https://discord.com/api/oauth2/token',
-            new URLSearchParams({
-                client_id: CLIENT_ID,
-                client_secret: CLIENT_SECRET,
-                grant_type: 'authorization_code',
-                code,
-                redirect_uri: REDIRECT_URI,
-            }),
+            new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI }),
             { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
         const userRes = await axios.get('https://discord.com/api/users/@me', {
@@ -58,9 +52,7 @@ app.get('/auth/callback', async (req, res) => {
         req.session.user = {
             id: userRes.data.id,
             username: userRes.data.username,
-            avatar: userRes.data.avatar
-                ? `https://cdn.discordapp.com/avatars/${userRes.data.id}/${userRes.data.avatar}.png`
-                : `https://cdn.discordapp.com/embed/avatars/0.png`
+            avatar: userRes.data.avatar ? `https://cdn.discordapp.com/avatars/${userRes.data.id}/${userRes.data.avatar}.png` : `https://cdn.discordapp.com/embed/avatars/0.png`
         };
         res.redirect('/');
     } catch (e) {
@@ -72,14 +64,15 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/auth/me', async (req, res) => {
     if (!req.session.user) return res.json(null);
     const user = req.session.user;
-    let balance = 0;
-    let inventory = [];
+    let balance = 0, inventory = [], health = 100, house = null;
     if (db) {
         const doc = await db.collection('voice_time').findOne({ _id: user.id });
         balance = doc ? Math.floor(doc.coins || 0) : 0;
         inventory = doc ? (doc.inventory || []) : [];
+        health = doc ? (doc.health || 100) : 100;
+        house = doc ? (doc.house || null) : null;
     }
-    res.json({ ...user, balance, inventory });
+    res.json({ ...user, balance, inventory, health, house });
 });
 
 app.get('/auth/logout', (req, res) => {
@@ -87,36 +80,66 @@ app.get('/auth/logout', (req, res) => {
     res.redirect('/');
 });
 
-// ─── Город и карта ────────────────────────────────────────────
-
-const TREE_POSITIONS = [];
-for (let i = 0; i < 60; i++) {
-    TREE_POSITIONS.push({
-        x: Math.random() * (MAP_W - 100) + 50,
-        y: Math.random() * (MAP_H - 100) + 50,
-        type: Math.random() > 0.3 ? 'tree' : 'bush'
-    });
-}
+// ─── Карта ────────────────────────────────────────────────────
 
 const CITY_CENTER = { x: MAP_W / 2, y: MAP_H / 2 };
 
+const TREE_POSITIONS = [];
+for (let i = 0; i < 100; i++) {
+    const x = Math.random() * (MAP_W - 100) + 50;
+    const y = Math.random() * (MAP_H - 100) + 50;
+    const distFromCity = Math.hypot(x - CITY_CENTER.x, y - CITY_CENTER.y);
+    if (distFromCity > 400) {
+        TREE_POSITIONS.push({ x, y, type: Math.random() > 0.3 ? 'tree' : 'bush' });
+    }
+}
+
+const ROAD_TILES = [];
+for (let rx = CITY_CENTER.x - 350; rx < CITY_CENTER.x + 350; rx += 32) {
+    for (let ry = CITY_CENTER.y - 280; ry < CITY_CENTER.y + 280; ry += 32) {
+        if (Math.abs(rx - CITY_CENTER.x) < 64 || Math.abs(ry - CITY_CENTER.y) < 64) {
+            ROAD_TILES.push({ x: rx, y: ry });
+        }
+    }
+}
+
 const BUILDINGS = [
-    { x: CITY_CENTER.x - 200, y: CITY_CENTER.y - 180, w: 160, h: 130, type: 'casino', label: '🎰 Казино' },
-    { x: CITY_CENTER.x + 40,  y: CITY_CENTER.y - 180, w: 160, h: 130, type: 'shop',   label: '🛒 Магазин' },
+    { x: CITY_CENTER.x - 340, y: CITY_CENTER.y - 260, w: 180, h: 150, type: 'casino', label: '🎰 Казино' },
+    { x: CITY_CENTER.x + 160, y: CITY_CENTER.y - 260, w: 180, h: 150, type: 'shop',   label: '🛒 Магазин' },
+    { x: CITY_CENTER.x - 90,  y: CITY_CENTER.y - 260, w: 250, h: 150, type: 'tavern', label: '🍺 Таверна' },
 ];
+
+const LAMPS = [];
+for (let lx = CITY_CENTER.x - 300; lx < CITY_CENTER.x + 350; lx += 120) {
+    for (let ly = CITY_CENTER.y - 280; ly < CITY_CENTER.y + 280; ly += 100) {
+        if (Math.abs(lx - CITY_CENTER.x) < 64 || Math.abs(ly - CITY_CENTER.y) < 64) {
+            LAMPS.push({ x: lx, y: ly });
+        }
+    }
+}
 
 const FISHING_ZONES = [
-    { x: 200, y: MAP_H - 300, w: 250, h: 160, label: '🎣 Озеро' },
-    { x: MAP_W - 450, y: MAP_H - 300, w: 250, h: 160, label: '🎣 Пруд' },
+    { x: 200, y: MAP_H - 350, w: 280, h: 200, label: '🎣 Лесное озеро' },
+    { x: MAP_W - 480, y: MAP_H - 350, w: 280, h: 200, label: '🎣 Тихий пруд' },
 ];
-
-const PLAYER_SPEED = 4;
 
 // ─── Игровой сервер ───────────────────────────────────────────
 
 const players = {};
 const fishTimers = {};
 const discordSockets = {};
+const houses = {};
+const coffeeTimers = {};
+
+// Загружаем домики из БД
+(async () => {
+    if (db) {
+        const docs = await db.collection('voice_time').find({ house: { $exists: true } }).toArray();
+        for (const doc of docs) {
+            if (doc.house) houses[doc._id] = doc.house;
+        }
+    }
+})();
 
 io.on('connection', (socket) => {
     console.log('Игрок подключился:', socket.id);
@@ -124,20 +147,16 @@ io.on('connection', (socket) => {
     players[socket.id] = {
         x: CITY_CENTER.x + Math.random() * 100 - 50,
         y: CITY_CENTER.y + Math.random() * 100 - 50,
-        name: 'Игрок',
-        avatar: null,
-        balance: 0,
-        discordId: null,
-        inventory: []
+        name: 'Игрок', avatar: null, balance: 0, discordId: null,
+        inventory: [], health: 100, speed: 4, house: null, dir: 'down', emoji: null
     };
 
     socket.emit('mapData', {
-        mapW: MAP_W,
-        mapH: MAP_H,
-        trees: TREE_POSITIONS,
-        buildings: BUILDINGS,
+        mapW: MAP_W, mapH: MAP_H,
+        trees: TREE_POSITIONS, roadTiles: ROAD_TILES,
+        buildings: BUILDINGS, lamps: LAMPS,
         fishingZones: FISHING_ZONES,
-        cityCenter: CITY_CENTER
+        cityCenter: CITY_CENTER, houses
     });
     socket.emit('currentPlayers', players);
     socket.broadcast.emit('newPlayer', { id: socket.id, ...players[socket.id] });
@@ -145,16 +164,9 @@ io.on('connection', (socket) => {
     socket.on('setProfile', (data) => {
         if (players[socket.id]) {
             const oldSocketId = discordSockets[data.discordId];
-            if (oldSocketId && oldSocketId !== socket.id) {
-                const oldSocket = io.sockets.sockets.get(oldSocketId);
-                if (oldSocket) {
-                    oldSocket.emit('duplicateSession');
-                    oldSocket.disconnect(true);
-                }
-                if (players[oldSocketId]) {
-                    delete players[oldSocketId];
-                    io.emit('playerDisconnected', oldSocketId);
-                }
+            if (oldSocketId && oldSocketId !== socket.id && players[oldSocketId]) {
+                delete players[oldSocketId];
+                io.emit('playerDisconnected', oldSocketId);
             }
             discordSockets[data.discordId] = socket.id;
             players[socket.id].name = data.name;
@@ -162,12 +174,11 @@ io.on('connection', (socket) => {
             players[socket.id].balance = data.balance || 0;
             players[socket.id].discordId = data.discordId;
             players[socket.id].inventory = data.inventory || [];
+            players[socket.id].health = data.health || 100;
+            players[socket.id].house = data.house || null;
             io.emit('playerUpdated', {
-                id: socket.id,
-                name: data.name,
-                avatar: data.avatar,
-                balance: data.balance,
-                inventory: data.inventory
+                id: socket.id, name: data.name, avatar: data.avatar,
+                balance: data.balance, inventory: data.inventory, health: data.health, house: data.house
             });
         }
     });
@@ -176,86 +187,142 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             players[socket.id].x = Math.max(10, Math.min(MAP_W - 10, data.x));
             players[socket.id].y = Math.max(10, Math.min(MAP_H - 10, data.y));
-            socket.broadcast.emit('playerMoved', {
-                id: socket.id,
-                x: players[socket.id].x,
-                y: players[socket.id].y,
-                dir: data.dir
-            });
+            players[socket.id].dir = data.dir;
+            socket.broadcast.emit('playerMoved', { id: socket.id, x: players[socket.id].x, y: players[socket.id].y, dir: data.dir });
+        }
+    });
+
+    // Эмодзи
+    socket.on('emoji', (data) => {
+        if (players[socket.id]) {
+            players[socket.id].emoji = data.emoji;
+            players[socket.id].emojiTime = Date.now();
+            io.emit('playerEmoji', { id: socket.id, emoji: data.emoji });
+            setTimeout(() => {
+                if (players[socket.id]) players[socket.id].emoji = null;
+                io.emit('playerEmoji', { id: socket.id, emoji: null });
+            }, 3000);
         }
     });
 
     // Рыбалка
-    socket.on('startFishing', (data) => {
+    socket.on('startFishing', () => {
         const player = players[socket.id];
         if (!player) return;
         const inZone = FISHING_ZONES.some(z =>
-            player.x > z.x && player.x < z.x + z.w &&
-            player.y > z.y && player.y < z.y + z.h
+            player.x > z.x && player.x < z.x + z.w && player.y > z.y && player.y < z.y + z.h
         );
-        if (!inZone) {
-            socket.emit('fishingError', { message: 'Нужно быть у водоёма чтобы рыбачить!' });
-            return;
-        }
-
-        const difficulty = 0.5 + Math.random() * 0.5;
-        const fishTypes = [
-            { name: '🐟 Карась', price: 10, speed: 0.3 },
-            { name: '🐠 Окунь', price: 15, speed: 0.5 },
-            { name: '🐡 Фугу', price: 25, speed: 0.7 },
-            { name: '🦈 Акула', price: 50, speed: 0.9 },
-            { name: '🐳 Кит', price: 100, speed: 1.0 },
-        ];
-        const fish = fishTypes[Math.floor(Math.random() * fishTypes.length)];
-
-        socket.emit('fishingGame', {
-            fish: fish.name,
-            price: fish.price,
-            speed: fish.speed,
-            duration: 5000
-        });
-    });
-
-    socket.on('fishResult', (data) => {
-        const player = players[socket.id];
-        if (!player) return;
-
-        if (data.caught) {
-            if (db && player.discordId) {
+        if (!inZone) { socket.emit('fishingError', { message: 'Нужно быть у водоёма!' }); return; }
+        socket.emit('fishingStarted');
+        const catchTime = 3000 + Math.random() * 4000;
+        fishTimers[socket.id] = setTimeout(() => {
+            const fishTypes = [
+                { name: '🐟 Карась', price: 10, icon: 'fish1' },
+                { name: '🐠 Окунь', price: 15, icon: 'fish2' },
+            ];
+            const fish = fishTypes[Math.floor(Math.random() * fishTypes.length)];
+            const caught = Math.random() > 0.3;
+            if (caught && db && player.discordId) {
                 db.collection('voice_time').updateOne(
                     { _id: player.discordId },
-                    {
-                        $inc: { coins: data.price },
-                        $push: { inventory: { name: data.fish, price: data.price, date: new Date().toISOString() } }
-                    },
+                    { $inc: { coins: fish.price }, $push: { inventory: { name: fish.name, price: fish.price, icon: fish.icon, date: new Date().toISOString() } } },
                     { upsert: true }
                 ).catch(e => console.error('Ошибка начисления:', e));
+                player.balance += fish.price;
+                if (!player.inventory) player.inventory = [];
+                player.inventory.push({ name: fish.name, price: fish.price, icon: fish.icon });
+                socket.emit('fishCaught', { fish: fish.name, price: fish.price, balance: player.balance, inventory: player.inventory, icon: fish.icon });
+                io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
+            } else {
+                socket.emit('fishLost', { fish: fish.name });
             }
-            player.balance += data.price;
-            if (!player.inventory) player.inventory = [];
-            player.inventory.push({ name: data.fish, price: data.price });
-            socket.emit('fishCaught', { fish: data.fish, price: data.price, balance: player.balance, inventory: player.inventory });
-            io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
-        } else {
-            socket.emit('fishLost', { fish: data.fish });
-        }
+            delete fishTimers[socket.id];
+        }, catchTime);
     });
 
+    socket.on('cancelFishing', () => {
+        if (fishTimers[socket.id]) { clearTimeout(fishTimers[socket.id]); delete fishTimers[socket.id]; }
+    });
+
+    // Продажа рыбы
+    socket.on('sellFish', (data) => {
+        const player = players[socket.id];
+        if (!player || !player.inventory) return;
+        const idx = player.inventory.findIndex(item => item.name === data.fishName && item.price === data.price);
+        if (idx === -1) return;
+        const sold = player.inventory.splice(idx, 1)[0];
+        player.balance += sold.price;
+        if (db && player.discordId) {
+            db.collection('voice_time').updateOne(
+                { _id: player.discordId },
+                { $inc: { coins: sold.price }, $set: { inventory: player.inventory } }
+            ).catch(e => console.error('Ошибка продажи:', e));
+        }
+        socket.emit('fishSold', { fish: sold.name, price: sold.price, balance: player.balance, inventory: player.inventory });
+        io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
+    });
+
+    // Домик
+    socket.on('placeHouse', (data) => {
+        const player = players[socket.id];
+        if (!player || player.balance < 5000 || player.house) return;
+        const hx = data.x, hy = data.y;
+        const distFromCity = Math.hypot(hx - CITY_CENTER.x, hy - CITY_CENTER.y);
+        if (distFromCity < 450) { socket.emit('houseError', { message: 'Слишком близко к городу!' }); return; }
+        for (const z of FISHING_ZONES) {
+            if (hx > z.x && hx < z.x + z.w && hy > z.y && hy < z.y + z.h) {
+                socket.emit('houseError', { message: 'Нельзя строить на воде!' }); return;
+            }
+        }
+        for (const h of Object.values(houses)) {
+            if (Math.abs(hx - h.x) < 80 && Math.abs(hy - h.y) < 80) {
+                socket.emit('houseError', { message: 'Слишком близко к другому домику!' }); return;
+            }
+        }
+        player.balance -= 5000;
+        player.house = { x: hx, y: hy, owner: player.name };
+        houses[player.discordId] = player.house;
+        if (db && player.discordId) {
+            db.collection('voice_time').updateOne(
+                { _id: player.discordId },
+                { $set: { coins: player.balance, house: player.house } }
+            ).catch(e => console.error('Ошибка домика:', e));
+        }
+        io.emit('housePlaced', { ownerId: player.discordId, house: player.house, balance: player.balance });
+        io.emit('playerUpdated', { id: socket.id, balance: player.balance, house: player.house });
+    });
+
+    // Кофе
+    socket.on('drinkCoffee', () => {
+        const player = players[socket.id];
+        if (!player) return;
+        const now = Date.now();
+        const lastCoffee = coffeeTimers[player.discordId] || 0;
+        if (now - lastCoffee < 300000) {
+            const remaining = Math.ceil((300000 - (now - lastCoffee)) / 60000);
+            socket.emit('coffeeError', { message: `Кофе будет готов через ${remaining} мин.` });
+            return;
+        }
+        coffeeTimers[player.discordId] = now;
+        player.speed = 6;
+        socket.emit('coffeeActive', { speed: 6 });
+        setTimeout(() => {
+            if (players[socket.id]) {
+                players[socket.id].speed = 4;
+                socket.emit('coffeeExpired', { speed: 4 });
+            }
+        }, 60000);
+    });
+
+    // Чат
     socket.on('chatMessage', (data) => {
         if (players[socket.id]) {
-            io.emit('chatMessage', {
-                id: socket.id,
-                name: players[socket.id].name,
-                text: data.text.substring(0, 100)
-            });
+            io.emit('chatMessage', { id: socket.id, name: players[socket.id].name, text: data.text.substring(0, 100) });
         }
     });
 
     socket.on('disconnect', () => {
-        if (fishTimers[socket.id]) {
-            clearTimeout(fishTimers[socket.id]);
-            delete fishTimers[socket.id];
-        }
+        if (fishTimers[socket.id]) { clearTimeout(fishTimers[socket.id]); delete fishTimers[socket.id]; }
         const player = players[socket.id];
         if (player && player.discordId && discordSockets[player.discordId] === socket.id) {
             delete discordSockets[player.discordId];
