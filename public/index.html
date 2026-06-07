@@ -206,27 +206,14 @@ function draw(){
     if(offscreenCanvas)ctx.drawImage(offscreenCanvas,camera.x,camera.y,canvas.width,canvas.height,0,0,canvas.width,canvas.height);
     const waterImg=loadTexture('/water.png');
     for(const z of mapData.fishingZones){for(let wy=z.y;wy<z.y+z.h;wy+=32)for(let wx=z.x;wx<z.x+z.w;wx+=32){const sx=wx-camera.x,sy=wy-camera.y;if(waterImg.complete)ctx.drawImage(waterImg,sx,sy,32,32);else{ctx.fillStyle='#2980b9';ctx.fillRect(sx,sy,32,32);}}ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText(z.label,z.x+z.w/2-camera.x,z.y-8-camera.y);}
-    for(const b of mapData.buildings){
+    for (const b of mapData.buildings) {
         const sx = b.x - camera.x, sy = b.y - camera.y;
         if (b.type === 'casino') {
             const img = loadTexture('/casino.png');
             ctx.drawImage(img, sx - 10, sy - 20, b.w + 20, b.h + 40);
         } else if (b.type === 'tavern') {
-            ctx.fillStyle = '#5a3a1a';
-            ctx.fillRect(sx, sy, b.w, b.h);
-            ctx.fillStyle = '#8B0000';
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(sx + b.w/2, sy - 30);
-            ctx.lineTo(sx + b.w, sy);
-            ctx.fill();
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(sx, sy, b.w, b.h);
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = 'white';
-            ctx.fillText(b.label, sx + b.w/2, sy + b.h/2);
+            const img = loadTexture('/shop.png');
+            ctx.drawImage(img, sx - 10, sy - 20, b.w + 20, b.h + 40);
         }
     }
     if(mapData.houses){const hi=loadTexture('/stone.png');for(const[oid,h]of Object.entries(mapData.houses)){const sx=h.x-camera.x,sy=h.y-camera.y;if(hi.complete)ctx.drawImage(hi,sx-30,sy-30,60,60);else{ctx.fillStyle='#8B4513';ctx.fillRect(sx-30,sy-30,60,60);}ctx.fillStyle='white';ctx.font='9px Arial';ctx.textAlign='center';ctx.fillText(h.owner||'Домик',sx,sy-35);}}
