@@ -80,8 +80,7 @@ app.get('/auth/logout', (req, res) => {
     res.redirect('/');
 });
 
-// ─── Карта ────────────────────────────────────────────────────
-
+// Карта
 const CITY_CENTER = { x: MAP_W / 2, y: MAP_H / 2 };
 
 const TREE_POSITIONS = [];
@@ -89,41 +88,32 @@ for (let i = 0; i < 100; i++) {
     const x = Math.random() * (MAP_W - 100) + 50;
     const y = Math.random() * (MAP_H - 100) + 50;
     const distFromCity = Math.hypot(x - CITY_CENTER.x, y - CITY_CENTER.y);
-    if (distFromCity > 400) {
-        TREE_POSITIONS.push({ x, y, type: Math.random() > 0.3 ? 'tree' : 'bush' });
-    }
+    if (distFromCity > 400) TREE_POSITIONS.push({ x, y, type: Math.random() > 0.3 ? 'tree' : 'bush' });
 }
 
 const ROAD_TILES = [];
 for (let rx = CITY_CENTER.x - 350; rx < CITY_CENTER.x + 350; rx += 32) {
     for (let ry = CITY_CENTER.y - 280; ry < CITY_CENTER.y + 280; ry += 32) {
-        if (Math.abs(rx - CITY_CENTER.x) < 64 || Math.abs(ry - CITY_CENTER.y) < 64) {
-            ROAD_TILES.push({ x: rx, y: ry });
-        }
+        if (Math.abs(rx - CITY_CENTER.x) < 64 || Math.abs(ry - CITY_CENTER.y) < 64) ROAD_TILES.push({ x: rx, y: ry });
     }
 }
 
 const BUILDINGS = [
-    { x: CITY_CENTER.x - 340, y: CITY_CENTER.y - 260, w: 180, h: 150, type: 'casino', label: '🎰 Казино' },
-    { x: CITY_CENTER.x + 160, y: CITY_CENTER.y - 260, w: 180, h: 150, type: 'shop',   label: '🛒 Магазин' },
-    { x: CITY_CENTER.x - 90,  y: CITY_CENTER.y - 260, w: 250, h: 150, type: 'tavern', label: '🍺 Таверна' },
+    { x: CITY_CENTER.x - 300, y: CITY_CENTER.y - 260, w: 250, h: 160, type: 'tavern', label: '🍺 Пьяный Кусик' },
+    { x: CITY_CENTER.x + 80, y: CITY_CENTER.y - 260, w: 200, h: 160, type: 'casino', label: '🎰 Казино' },
 ];
 
 const LAMPS = [];
 for (let lx = CITY_CENTER.x - 300; lx < CITY_CENTER.x + 350; lx += 120) {
     for (let ly = CITY_CENTER.y - 280; ly < CITY_CENTER.y + 280; ly += 100) {
-        if (Math.abs(lx - CITY_CENTER.x) < 64 || Math.abs(ly - CITY_CENTER.y) < 64) {
-            LAMPS.push({ x: lx, y: ly });
-        }
+        if (Math.abs(lx - CITY_CENTER.x) < 64 || Math.abs(ly - CITY_CENTER.y) < 64) LAMPS.push({ x: lx, y: ly });
     }
 }
 
 const FISHING_ZONES = [
-    { x: 200, y: MAP_H - 350, w: 280, h: 200, label: '🎣 Лесное озеро' },
-    { x: MAP_W - 480, y: MAP_H - 350, w: 280, h: 200, label: '🎣 Тихий пруд' },
+    { x: 200, y: MAP_H - 400, w: 320, h: 240, label: '🎣 Лесное озеро' },
+    { x: MAP_W - 520, y: MAP_H - 400, w: 320, h: 240, label: '🎣 Тихий пруд' },
 ];
-
-// ─── Игровой сервер ───────────────────────────────────────────
 
 const players = {};
 const fishTimers = {};
@@ -131,19 +121,15 @@ const discordSockets = {};
 const houses = {};
 const coffeeTimers = {};
 
-// Загружаем домики из БД
 (async () => {
     if (db) {
         const docs = await db.collection('voice_time').find({ house: { $exists: true } }).toArray();
-        for (const doc of docs) {
-            if (doc.house) houses[doc._id] = doc.house;
-        }
+        for (const doc of docs) { if (doc.house) houses[doc._id] = doc.house; }
     }
 })();
 
 io.on('connection', (socket) => {
     console.log('Игрок подключился:', socket.id);
-
     players[socket.id] = {
         x: CITY_CENTER.x + Math.random() * 100 - 50,
         y: CITY_CENTER.y + Math.random() * 100 - 50,
@@ -192,7 +178,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Эмодзи
     socket.on('emoji', (data) => {
         if (players[socket.id]) {
             players[socket.id].emoji = data.emoji;
@@ -205,7 +190,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Рыбалка
     socket.on('startFishing', () => {
         const player = players[socket.id];
         if (!player) return;
@@ -214,37 +198,60 @@ io.on('connection', (socket) => {
         );
         if (!inZone) { socket.emit('fishingError', { message: 'Нужно быть у водоёма!' }); return; }
         socket.emit('fishingStarted');
-        const catchTime = 3000 + Math.random() * 4000;
+        const catchTime = 3000 + Math.random() * 7000;
         fishTimers[socket.id] = setTimeout(() => {
-            const fishTypes = [
-                { name: '🐟 Карась', price: 10, icon: 'fish1' },
-                { name: '🐠 Окунь', price: 15, icon: 'fish2' },
-            ];
-            const fish = fishTypes[Math.floor(Math.random() * fishTypes.length)];
-            const caught = Math.random() > 0.3;
-            if (caught && db && player.discordId) {
-                db.collection('voice_time').updateOne(
-                    { _id: player.discordId },
-                    { $inc: { coins: fish.price }, $push: { inventory: { name: fish.name, price: fish.price, icon: fish.icon, date: new Date().toISOString() } } },
-                    { upsert: true }
-                ).catch(e => console.error('Ошибка начисления:', e));
-                player.balance += fish.price;
-                if (!player.inventory) player.inventory = [];
-                player.inventory.push({ name: fish.name, price: fish.price, icon: fish.icon });
-                socket.emit('fishCaught', { fish: fish.name, price: fish.price, balance: player.balance, inventory: player.inventory, icon: fish.icon });
-                io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
-            } else {
-                socket.emit('fishLost', { fish: fish.name });
-            }
-            delete fishTimers[socket.id];
+            socket.emit('fishingReady');
+            const pullTimeout = setTimeout(() => {
+                socket.emit('fishingMissed');
+                delete fishTimers[socket.id];
+            }, 2000);
+            fishTimers[socket.id] = { pullTimeout };
         }, catchTime);
     });
 
-    socket.on('cancelFishing', () => {
-        if (fishTimers[socket.id]) { clearTimeout(fishTimers[socket.id]); delete fishTimers[socket.id]; }
+    socket.on('pullFish', () => {
+        const timer = fishTimers[socket.id];
+        if (!timer || !timer.pullTimeout) return;
+        clearTimeout(timer.pullTimeout);
+        delete fishTimers[socket.id];
+
+        const player = players[socket.id];
+        if (!player) return;
+
+        const fishTypes = [
+            { name: '🐟 Карась', price: 10, chance: 0.50 },
+            { name: '🐠 Окунь', price: 15, chance: 0.25 },
+            { name: '🐡 Фугу', price: 30, chance: 0.12 },
+            { name: '🦈 Акула', price: 60, chance: 0.08 },
+            { name: '🐳 Кит', price: 150, chance: 0.05 },
+        ];
+        const roll = Math.random();
+        let cum = 0;
+        let fish = fishTypes[0];
+        for (const f of fishTypes) { cum += f.chance; if (roll < cum) { fish = f; break; } }
+
+        if (db && player.discordId) {
+            db.collection('voice_time').updateOne(
+                { _id: player.discordId },
+                { $inc: { coins: fish.price }, $push: { inventory: { name: fish.name, price: fish.price, date: new Date().toISOString() } } },
+                { upsert: true }
+            ).catch(e => console.error('Ошибка начисления:', e));
+        }
+        player.balance += fish.price;
+        if (!player.inventory) player.inventory = [];
+        player.inventory.push({ name: fish.name, price: fish.price });
+        socket.emit('fishCaught', { fish: fish.name, price: fish.price, balance: player.balance, inventory: player.inventory });
+        io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
     });
 
-    // Продажа рыбы
+    socket.on('cancelFishing', () => {
+        if (fishTimers[socket.id]) {
+            if (fishTimers[socket.id].pullTimeout) clearTimeout(fishTimers[socket.id].pullTimeout);
+            else clearTimeout(fishTimers[socket.id]);
+            delete fishTimers[socket.id];
+        }
+    });
+
     socket.on('sellFish', (data) => {
         const player = players[socket.id];
         if (!player || !player.inventory) return;
@@ -262,7 +269,6 @@ io.on('connection', (socket) => {
         io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
     });
 
-    // Домик
     socket.on('placeHouse', (data) => {
         const player = players[socket.id];
         if (!player || player.balance < 5000 || player.house) return;
@@ -292,7 +298,6 @@ io.on('connection', (socket) => {
         io.emit('playerUpdated', { id: socket.id, balance: player.balance, house: player.house });
     });
 
-    // Кофе
     socket.on('drinkCoffee', () => {
         const player = players[socket.id];
         if (!player) return;
@@ -307,26 +312,45 @@ io.on('connection', (socket) => {
         player.speed = 6;
         socket.emit('coffeeActive', { speed: 6 });
         setTimeout(() => {
-            if (players[socket.id]) {
-                players[socket.id].speed = 4;
-                socket.emit('coffeeExpired', { speed: 4 });
-            }
+            if (players[socket.id]) { players[socket.id].speed = 4; socket.emit('coffeeExpired', { speed: 4 }); }
         }, 60000);
     });
 
-    // Чат
     socket.on('chatMessage', (data) => {
         if (players[socket.id]) {
             io.emit('chatMessage', { id: socket.id, name: players[socket.id].name, text: data.text.substring(0, 100) });
         }
     });
 
-    socket.on('disconnect', () => {
-        if (fishTimers[socket.id]) { clearTimeout(fishTimers[socket.id]); delete fishTimers[socket.id]; }
+    socket.on('tavernAction', (data) => {
         const player = players[socket.id];
-        if (player && player.discordId && discordSockets[player.discordId] === socket.id) {
-            delete discordSockets[player.discordId];
+        if (!player) return;
+        switch (data.action) {
+            case 'beer':
+                if (player.balance < 10) { socket.emit('tavernResult', { success: false, message: 'Не хватает кусиков!' }); return; }
+                player.balance -= 10;
+                player.health = Math.min(100, player.health + 20);
+                socket.emit('tavernResult', { success: true, message: 'Васыль наливает тебе эль. -10 кс, +20 здоровья.', balance: player.balance, health: player.health });
+                io.emit('playerUpdated', { id: socket.id, balance: player.balance, health: player.health });
+                break;
+            case 'room':
+                if (player.balance < 50) { socket.emit('tavernResult', { success: false, message: 'Не хватает кусиков!' }); return; }
+                player.balance -= 50;
+                player.health = 100;
+                socket.emit('tavernResult', { success: true, message: 'Васыль даёт ключ. -50 кс, здоровье 100.', balance: player.balance, health: player.health });
+                io.emit('playerUpdated', { id: socket.id, balance: player.balance, health: player.health });
+                break;
         }
+    });
+
+    socket.on('disconnect', () => {
+        if (fishTimers[socket.id]) {
+            if (fishTimers[socket.id].pullTimeout) clearTimeout(fishTimers[socket.id].pullTimeout);
+            else clearTimeout(fishTimers[socket.id]);
+            delete fishTimers[socket.id];
+        }
+        const player = players[socket.id];
+        if (player && player.discordId && discordSockets[player.discordId] === socket.id) delete discordSockets[player.discordId];
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });
