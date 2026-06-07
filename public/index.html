@@ -71,6 +71,34 @@
             display: none;
             border: 1px solid #9b59b6;
         }
+
+        #fishing-ui {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #3498db;
+        }
+        #fishing-ui .fish-result {
+            font-size: 20px;
+            margin-top: 10px;
+        }
+        #fish-btn, #cancel-fish-btn {
+            margin: 8px 5px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #fish-btn { background: #3498db; color: white; }
+        #cancel-fish-btn { background: #e74c3c; color: white; }
     </style>
 </head>
 <body>
@@ -94,6 +122,11 @@
 </div>
 
 <div id="zone-tooltip"></div>
+<div id="fishing-ui">
+    <div class="fish-result" id="fish-text">🎣 Закидываем удочку...</div>
+    <button id="fish-btn" onclick="startFishing()">🎣 Рыбачить</button>
+    <button id="cancel-fish-btn" onclick="cancelFishing()">✖ Отмена</button>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -103,18 +136,29 @@
     const keys = {};
     const SPEED = 3;
     const avatarCache = {};
+    const textureCache = {};
+    let isFishing = false;
+    let currentUser = null;
 
-    // Зоны на карте
     const ZONES = [
-        { x: 50,  y: 50,  w: 160, h: 120, color: '#f1c40f', label: '🎰 Казино',  name: 'casino' },
-        { x: 590, y: 50,  w: 160, h: 120, color: '#2ecc71', label: '🛒 Магазин', name: 'shop' },
-        { x: 300, y: 450, w: 200, h: 120, color: '#e74c3c', label: '⚔️ PvP зона', name: 'pvp' },
+        { x: 50,  y: 30,  w: 160, h: 130, color: '#f1c40f', label: '🎰 Казино',  name: 'casino' },
+        { x: 590, y: 30,  w: 160, h: 130, color: '#2ecc71', label: '🛒 Магазин', name: 'shop' },
+        { x: 300, y: 430, w: 200, h: 140, color: '#3498db', label: '🎣 Рыбалка', name: 'fish' },
     ];
+
+    function loadTexture(src) {
+        if (textureCache[src]) return textureCache[src];
+        const img = new Image();
+        img.src = src;
+        textureCache[src] = img;
+        return img;
+    }
 
     fetch('/auth/me')
         .then(r => r.json())
         .then(user => {
             if (user) {
+                currentUser = user;
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('game-screen').style.display = 'flex';
                 document.getElementById('user-name').textContent = user.username;
@@ -141,6 +185,24 @@
         return null;
     }
 
+    function startFishing() {
+        if (!socket || !currentUser) return;
+        isFishing = true;
+        document.getElementById('fish-btn').style.display = 'none';
+        document.getElementById('cancel-fish-btn').style.display = 'inline-block';
+        document.getElementById('fish-text').textContent = '🎣 Закидываем удочку...';
+        document.getElementById('fishing-ui').style.display = 'block';
+        socket.emit('startFishing', { discordId: currentUser.id });
+    }
+
+    function cancelFishing() {
+        isFishing = false;
+        socket.emit('cancelFishing');
+        document.getElementById('fishing-ui').style.display = 'none';
+        document.getElementById('fish-btn').style.display = 'inline-block';
+        document.getElementById('cancel-fish-btn').style.display = 'none';
+    }
+
     function startGame(user) {
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
@@ -162,9 +224,9 @@
 
         socket.on('playerUpdated', (data) => {
             if (players[data.id]) {
-                players[data.id].name = data.name;
-                players[data.id].avatar = data.avatar;
-                players[data.id].balance = data.balance;
+                if (data.name) players[data.id].name = data.name;
+                if (data.avatar) players[data.id].avatar = data.avatar;
+                if (data.balance !== undefined) players[data.id].balance = data.balance;
             }
         });
 
@@ -179,6 +241,23 @@
             delete players[id];
         });
 
+        socket.on('fishingStarted', () => {
+            document.getElementById('fish-text').textContent = '🎣 Клюёт! Ждём...';
+        });
+
+        socket.on('fishCaught', (data) => {
+            isFishing = false;
+            document.getElementById('fishing-ui').style.display = 'block';
+            document.getElementById('fish-btn').style.display = 'inline-block';
+            document.getElementById('cancel-fish-btn').style.display = 'none';
+            document.getElementById('fish-text').textContent = `🎣 Поймал: ${data.fish}! +${data.price} кусиков`;
+            document.getElementById('balance-val').textContent = data.balance;
+        });
+
+        socket.on('fishingError', (data) => {
+            alert(data.message);
+        });
+
         function update() {
             if (!myId || !players[myId]) return;
             let moved = false;
@@ -187,49 +266,77 @@
             if (keys['ArrowLeft']  || keys['a'] || keys['A']) { players[myId].x -= SPEED; moved = true; }
             if (keys['ArrowRight'] || keys['d'] || keys['D']) { players[myId].x += SPEED; moved = true; }
 
-            // Границы карты
             players[myId].x = Math.max(20, Math.min(780, players[myId].x));
             players[myId].y = Math.max(20, Math.min(580, players[myId].y));
 
             if (moved) socket.emit('move', { x: players[myId].x, y: players[myId].y });
 
-            // Проверка зоны
             const zone = getZoneAt(players[myId].x, players[myId].y);
             if (zone) {
                 tooltip.textContent = `Вы в зоне: ${zone.label}`;
                 tooltip.style.display = 'block';
+
+                if (zone.name === 'fish' && !isFishing) {
+                    document.getElementById('fishing-ui').style.display = 'block';
+                    document.getElementById('fish-btn').style.display = 'inline-block';
+                    document.getElementById('cancel-fish-btn').style.display = 'none';
+                }
             } else {
                 tooltip.style.display = 'none';
+                if (!isFishing) {
+                    document.getElementById('fishing-ui').style.display = 'none';
+                }
             }
         }
 
         function drawZones(ctx) {
-            for (const z of ZONES) {
-                ctx.fillStyle = z.color + '33'; // прозрачный фон
-                ctx.fillRect(z.x, z.y, z.w, z.h);
-                ctx.strokeStyle = z.color;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(z.x, z.y, z.w, z.h);
-                ctx.fillStyle = z.color;
-                ctx.font = 'bold 16px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(z.label, z.x + z.w / 2, z.y + z.h / 2);
+            // Казино
+            const casino = loadTexture('/casino.png');
+            if (casino.complete) ctx.drawImage(casino, 50, 20, 160, 130);
+            else {
+                ctx.fillStyle = '#f1c40f33'; ctx.fillRect(50, 30, 160, 130);
+                ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 2; ctx.strokeRect(50, 30, 160, 130);
             }
+
+            // Магазин
+            const shop = loadTexture('/shop.png');
+            if (shop.complete) ctx.drawImage(shop, 590, 20, 160, 130);
+            else {
+                ctx.fillStyle = '#2ecc7133'; ctx.fillRect(590, 30, 160, 130);
+                ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 2; ctx.strokeRect(590, 30, 160, 130);
+            }
+
+            // Водоём
+            const water = loadTexture('/water.png');
+            if (water.complete) {
+                for (let wy = 430; wy < 570; wy += 32) {
+                    for (let wx = 300; wx < 500; wx += 32) {
+                        ctx.drawImage(water, wx, wy, 32, 32);
+                    }
+                }
+            } else {
+                ctx.fillStyle = '#3498db33'; ctx.fillRect(300, 430, 200, 140);
+                ctx.strokeStyle = '#3498db'; ctx.lineWidth = 2; ctx.strokeRect(300, 430, 200, 140);
+            }
+
+            // Подписи
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#f1c40f'; ctx.fillText('🎰 Казино', 130, 18);
+            ctx.fillStyle = '#2ecc71'; ctx.fillText('🛒 Магазин', 670, 18);
+            ctx.fillStyle = '#3498db'; ctx.fillText('🎣 Рыбалка', 400, 422);
         }
 
         function drawPlayer(ctx, p, isMe) {
             const x = p.x, y = p.y;
 
-            // Тело
             ctx.fillStyle = isMe ? '#9b59b6' : '#e74c3c';
             ctx.fillRect(x - 12, y - 20, 24, 28);
 
-            // Ноги
             ctx.fillStyle = isMe ? '#7d3c98' : '#c0392b';
             ctx.fillRect(x - 10, y + 8, 8, 10);
             ctx.fillRect(x + 2,  y + 8, 8, 10);
 
-            // Аватарка
             if (p.avatar) {
                 const img = loadAvatar(p.avatar);
                 if (img.complete) {
@@ -247,7 +354,6 @@
                 }
             }
 
-            // Имя
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
@@ -256,29 +362,28 @@
             ctx.fillStyle = 'white';
             ctx.fillText(p.name || 'Игрок', x, y - 48);
 
-            // Баланс
             if (p.balance > 0) {
                 ctx.font = '11px Arial';
                 ctx.strokeStyle = 'black';
                 ctx.lineWidth = 2;
-                ctx.strokeText(`💰 ${p.balance}`, x, y - 60);
+                const balText = `💰 ${p.balance}`;
+                ctx.strokeText(balText, x, y - 60);
                 ctx.fillStyle = '#f1c40f';
-                ctx.fillText(`💰 ${p.balance}`, x, y - 60);
+                ctx.fillText(balText, x, y - 60);
             }
         }
 
         function draw() {
-            ctx.fillStyle = '#16213e';
-            ctx.fillRect(0, 0, 800, 600);
-
-            // Сетка
-            ctx.strokeStyle = '#1a2a4a';
-            ctx.lineWidth = 1;
-            for (let x = 0; x < 800; x += 40) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 600); ctx.stroke();
-            }
-            for (let y = 0; y < 600; y += 40) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke();
+            const grass = loadTexture('/grass.png');
+            if (grass.complete) {
+                for (let gy = 0; gy < 600; gy += 32) {
+                    for (let gx = 0; gx < 800; gx += 32) {
+                        ctx.drawImage(grass, gx, gy, 32, 32);
+                    }
+                }
+            } else {
+                ctx.fillStyle = '#16213e';
+                ctx.fillRect(0, 0, 800, 600);
             }
 
             drawZones(ctx);

@@ -82,7 +82,7 @@ app.get('/auth/me', async (req, res) => {
     let balance = 0;
     if (db) {
         const doc = await db.collection('voice_time').findOne({ _id: user.id });
-        balance = doc ? Math.floor(doc.seconds || 0) : 0;
+        balance = doc ? Math.floor(doc.coins || 0) : 0;
     }
 
     res.json({ ...user, balance });
@@ -96,6 +96,7 @@ app.get('/auth/logout', (req, res) => {
 // ─── Игровой сервер ───────────────────────────────────────────
 
 const players = {};
+const fishTimers = {};
 
 io.on('connection', (socket) => {
     console.log('Игрок подключился:', socket.id);
@@ -128,7 +129,58 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Рыбалка
+    socket.on('startFishing', (data) => {
+        const player = players[socket.id];
+        if (!player) return;
+
+        // Проверяем что игрок в зоне рыбалки
+        const x = player.x, y = player.y;
+        if (x > 300 && x < 500 && y > 430 && y < 570) {
+            // Случайный улов через 2-5 секунд
+            const catchTime = 2000 + Math.random() * 3000;
+            fishTimers[socket.id] = setTimeout(() => {
+                const fishTypes = [
+                    { name: '🐟 Карась', price: 10 },
+                    { name: '🐠 Окунь', price: 15 },
+                    { name: '🐡 Фугу', price: 25 },
+                    { name: '🦈 Акула', price: 50 },
+                    { name: '🐳 Кит', price: 100 },
+                ];
+                const fish = fishTypes[Math.floor(Math.random() * fishTypes.length)];
+
+                // Начисляем кусики в MongoDB
+                if (db) {
+                    db.collection('voice_time').updateOne(
+                        { _id: data.discordId },
+                        { $inc: { coins: fish.price } },
+                        { upsert: true }
+                    ).catch(e => console.error('Ошибка начисления:', e));
+                }
+
+                player.balance += fish.price;
+                socket.emit('fishCaught', { fish: fish.name, price: fish.price, balance: player.balance });
+                io.emit('playerUpdated', { id: socket.id, balance: player.balance });
+            }, catchTime);
+
+            socket.emit('fishingStarted');
+        } else {
+            socket.emit('fishingError', { message: 'Нужно быть у водоёма чтобы рыбачить!' });
+        }
+    });
+
+    socket.on('cancelFishing', () => {
+        if (fishTimers[socket.id]) {
+            clearTimeout(fishTimers[socket.id]);
+            delete fishTimers[socket.id];
+        }
+    });
+
     socket.on('disconnect', () => {
+        if (fishTimers[socket.id]) {
+            clearTimeout(fishTimers[socket.id]);
+            delete fishTimers[socket.id];
+        }
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });
