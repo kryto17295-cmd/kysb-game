@@ -3,110 +3,210 @@
 <head>
     <title>KYSb Game</title>
     <style>
-        * { margin: 0; padding: 0; }
-        body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif; }
+        
+        #login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            color: white;
+        }
+        #login-screen h1 { font-size: 36px; color: #9b59b6; }
+        #login-screen p { color: #aaa; }
+        #login-btn {
+            background: #5865F2;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #login-btn:hover { background: #4752c4; }
+
+        #game-screen { display: none; flex-direction: column; align-items: center; gap: 10px; }
+        #user-info { color: white; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        #user-info img { width: 32px; height: 32px; border-radius: 50%; }
+        #logout-btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
         canvas { border: 2px solid #9b59b6; }
     </style>
 </head>
 <body>
-<canvas id="game" width="800" height="600"></canvas>
+
+<div id="login-screen">
+    <h1>KYSb Game</h1>
+    <p>Войди через Discord чтобы играть</p>
+    <button id="login-btn" onclick="window.location.href='/auth/login'">
+        🎮 Войти через Discord
+    </button>
+</div>
+
+<div id="game-screen">
+    <div id="user-info">
+        <img id="user-avatar" src="" alt="">
+        <span id="user-name"></span>
+        <button id="logout-btn" onclick="window.location.href='/auth/logout'">Выйти</button>
+    </div>
+    <canvas id="game" width="800" height="600"></canvas>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const socket = io();
-
+    let socket;
+    let myId = null;
     const players = {};
     const keys = {};
-    let myId = null;
-
     const SPEED = 3;
+    const avatarCache = {};
 
-    document.addEventListener('keydown', e => keys[e.key] = true);
-    document.addEventListener('keyup', e => keys[e.key] = false);
+    // Проверяем авторизацию
+    fetch('/auth/me')
+        .then(r => r.json())
+        .then(user => {
+            if (user) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('game-screen').style.display = 'flex';
+                document.getElementById('user-name').textContent = user.username;
+                document.getElementById('user-avatar').src = user.avatar;
+                startGame(user);
+            } else {
+                document.getElementById('login-screen').style.display = 'flex';
+                document.getElementById('game-screen').style.display = 'none';
+            }
+        });
 
-    socket.on('currentPlayers', (serverPlayers) => {
-        myId = socket.id;
-        Object.assign(players, serverPlayers);
-    });
-
-    socket.on('newPlayer', (data) => {
-        players[data.id] = { x: data.x, y: data.y, name: data.name };
-    });
-
-    socket.on('playerMoved', (data) => {
-        if (players[data.id]) {
-            players[data.id].x = data.x;
-            players[data.id].y = data.y;
-        }
-    });
-
-    socket.on('playerDisconnected', (id) => {
-        delete players[id];
-    });
-
-    function update() {
-        if (!myId || !players[myId]) return;
-
-        let moved = false;
-        if (keys['ArrowUp'] || keys['w'] || keys['W']) { players[myId].y -= SPEED; moved = true; }
-        if (keys['ArrowDown'] || keys['s'] || keys['S']) { players[myId].y += SPEED; moved = true; }
-        if (keys['ArrowLeft'] || keys['a'] || keys['A']) { players[myId].x -= SPEED; moved = true; }
-        if (keys['ArrowRight'] || keys['d'] || keys['D']) { players[myId].x += SPEED; moved = true; }
-
-        if (moved) {
-            socket.emit('move', { x: players[myId].x, y: players[myId].y });
-        }
+    function loadAvatar(url) {
+        if (avatarCache[url]) return avatarCache[url];
+        const img = new Image();
+        img.src = url;
+        avatarCache[url] = img;
+        return img;
     }
 
-    function draw() {
-        // Фон — тёмная карта с клетками
-        ctx.fillStyle = '#16213e';
-        ctx.fillRect(0, 0, 800, 600);
+    function startGame(user) {
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        socket = io();
 
-        // Сетка
-        ctx.strokeStyle = '#1a2a4a';
-        ctx.lineWidth = 1;
-        for (let x = 0; x < 800; x += 40) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 600); ctx.stroke();
-        }
-        for (let y = 0; y < 600; y += 40) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke();
+        document.addEventListener('keydown', e => keys[e.key] = true);
+        document.addEventListener('keyup', e => keys[e.key] = false);
+
+        socket.on('currentPlayers', (serverPlayers) => {
+            myId = socket.id;
+            Object.assign(players, serverPlayers);
+            socket.emit('setProfile', { name: user.username, avatar: user.avatar });
+        });
+
+        socket.on('newPlayer', (data) => {
+            players[data.id] = { x: data.x, y: data.y, name: data.name, avatar: data.avatar };
+        });
+
+        socket.on('playerUpdated', (data) => {
+            if (players[data.id]) {
+                players[data.id].name = data.name;
+                players[data.id].avatar = data.avatar;
+            }
+        });
+
+        socket.on('playerMoved', (data) => {
+            if (players[data.id]) {
+                players[data.id].x = data.x;
+                players[data.id].y = data.y;
+            }
+        });
+
+        socket.on('playerDisconnected', (id) => {
+            delete players[id];
+        });
+
+        function update() {
+            if (!myId || !players[myId]) return;
+            let moved = false;
+            if (keys['ArrowUp'] || keys['w'] || keys['W'])    { players[myId].y -= SPEED; moved = true; }
+            if (keys['ArrowDown'] || keys['s'] || keys['S'])  { players[myId].y += SPEED; moved = true; }
+            if (keys['ArrowLeft'] || keys['a'] || keys['A'])  { players[myId].x -= SPEED; moved = true; }
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) { players[myId].x += SPEED; moved = true; }
+            if (moved) socket.emit('move', { x: players[myId].x, y: players[myId].y });
         }
 
-        // Игроки
-        for (const id in players) {
-            const p = players[id];
-            const isMe = id === myId;
+        function drawPlayer(ctx, p, isMe) {
+            const x = p.x, y = p.y;
 
             // Тело
             ctx.fillStyle = isMe ? '#9b59b6' : '#e74c3c';
-            ctx.fillRect(p.x - 12, p.y - 20, 24, 28);
-
-            // Голова
-            ctx.fillStyle = isMe ? '#c39bd3' : '#f1948a';
-            ctx.fillRect(p.x - 8, p.y - 36, 16, 16);
+            ctx.fillRect(x - 12, y - 20, 24, 28);
 
             // Ноги
             ctx.fillStyle = isMe ? '#7d3c98' : '#c0392b';
-            ctx.fillRect(p.x - 10, p.y + 8, 8, 10);
-            ctx.fillRect(p.x + 2, p.y + 8, 8, 10);
+            ctx.fillRect(x - 10, y + 8, 8, 10);
+            ctx.fillRect(x + 2,  y + 8, 8, 10);
+
+            // Аватарка вместо головы
+            if (p.avatar) {
+                const img = loadAvatar(p.avatar);
+                if (img.complete) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(x, y - 28, 14, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(img, x - 14, y - 42, 28, 28);
+                    ctx.restore();
+                    // Обводка
+                    ctx.beginPath();
+                    ctx.arc(x, y - 28, 14, 0, Math.PI * 2);
+                    ctx.strokeStyle = isMe ? '#9b59b6' : '#e74c3c';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = isMe ? '#c39bd3' : '#f1948a';
+                    ctx.beginPath();
+                    ctx.arc(x, y - 28, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
 
             // Имя
             ctx.fillStyle = 'white';
-            ctx.font = '12px Arial';
+            ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(isMe ? 'Ты' : p.name, p.x, p.y - 42);
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.strokeText(p.name || 'Игрок', x, y - 48);
+            ctx.fillText(p.name || 'Игрок', x, y - 48);
         }
-    }
 
-    function gameLoop() {
-        update();
-        draw();
-        requestAnimationFrame(gameLoop);
-    }
+        function draw() {
+            ctx.fillStyle = '#16213e';
+            ctx.fillRect(0, 0, 800, 600);
 
-    gameLoop();
+            // Сетка
+            ctx.strokeStyle = '#1a2a4a';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < 800; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 600); ctx.stroke();
+            }
+            for (let y = 0; y < 600; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke();
+            }
+
+            for (const id in players) {
+                drawPlayer(ctx, players[id], id === myId);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    }
 </script>
 </body>
 </html>
