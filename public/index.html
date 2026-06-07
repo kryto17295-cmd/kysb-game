@@ -206,7 +206,29 @@ function draw(){
     if(offscreenCanvas)ctx.drawImage(offscreenCanvas,camera.x,camera.y,canvas.width,canvas.height,0,0,canvas.width,canvas.height);
     const waterImg=loadTexture('/water.png');
     for(const z of mapData.fishingZones){for(let wy=z.y;wy<z.y+z.h;wy+=32)for(let wx=z.x;wx<z.x+z.w;wx+=32){const sx=wx-camera.x,sy=wy-camera.y;if(waterImg.complete)ctx.drawImage(waterImg,sx,sy,32,32);else{ctx.fillStyle='#2980b9';ctx.fillRect(sx,sy,32,32);}}ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText(z.label,z.x+z.w/2-camera.x,z.y-8-camera.y);}
-    for(const b of mapData.buildings){const sx=b.x-camera.x,sy=b.y-camera.y;ctx.fillStyle=b.type==='tavern'?'#5a3a1a':'#8B4513';ctx.fillRect(sx,sy,b.w,b.h);ctx.fillStyle='#8B0000';ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+b.w/2,sy-30);ctx.lineTo(sx+b.w,sy);ctx.fill();ctx.strokeStyle='#FFD700';ctx.lineWidth=2;ctx.strokeRect(sx,sy,b.w,b.h);ctx.font='bold 14px Arial';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText(b.label,sx+b.w/2,sy+b.h/2);}
+    for(const b of mapData.buildings){
+        const sx = b.x - camera.x, sy = b.y - camera.y;
+        if (b.type === 'casino') {
+            const img = loadTexture('/casino.png');
+            ctx.drawImage(img, sx - 10, sy - 20, b.w + 20, b.h + 40);
+        } else if (b.type === 'tavern') {
+            ctx.fillStyle = '#5a3a1a';
+            ctx.fillRect(sx, sy, b.w, b.h);
+            ctx.fillStyle = '#8B0000';
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + b.w/2, sy - 30);
+            ctx.lineTo(sx + b.w, sy);
+            ctx.fill();
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx, sy, b.w, b.h);
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'white';
+            ctx.fillText(b.label, sx + b.w/2, sy + b.h/2);
+        }
+    }
     if(mapData.houses){const hi=loadTexture('/stone.png');for(const[oid,h]of Object.entries(mapData.houses)){const sx=h.x-camera.x,sy=h.y-camera.y;if(hi.complete)ctx.drawImage(hi,sx-30,sy-30,60,60);else{ctx.fillStyle='#8B4513';ctx.fillRect(sx-30,sy-30,60,60);}ctx.fillStyle='white';ctx.font='9px Arial';ctx.textAlign='center';ctx.fillText(h.owner||'Домик',sx,sy-35);}}
     for(const id in players){const p=players[id];const sx=p.x-camera.x,sy=p.y-camera.y;ctx.fillStyle=id===myId?'#9b59b6':'#e74c3c';ctx.fillRect(sx-12,sy-20,24,28);ctx.fillStyle=id===myId?'#7d3c98':'#c0392b';ctx.fillRect(sx-10,sy+8,8,10);ctx.fillRect(sx+2,sy+8,8,10);if(p.avatar){const av=loadAvatar(p.avatar);if(av.complete){ctx.save();ctx.beginPath();ctx.arc(sx,sy-28,14,0,Math.PI*2);ctx.clip();ctx.drawImage(av,sx-14,sy-42,28,28);ctx.restore();ctx.beginPath();ctx.arc(sx,sy-28,14,0,Math.PI*2);ctx.strokeStyle=id===myId?'#9b59b6':'#e74c3c';ctx.lineWidth=2;ctx.stroke();}}ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.strokeStyle='black';ctx.lineWidth=2;ctx.strokeText(p.name||'Игрок',sx,sy-46);ctx.fillStyle='white';ctx.fillText(p.name||'Игрок',sx,sy-46);if(p.balance>0){ctx.font='10px Arial';ctx.strokeStyle='black';ctx.lineWidth=2;ctx.strokeText('💰'+p.balance,sx,sy-56);ctx.fillStyle='#f1c40f';ctx.fillText('💰'+p.balance,sx,sy-56);}if(p.emoji&&Date.now()-(p.emojiTime||0)<3000){ctx.font='20px Arial';ctx.textAlign='center';ctx.fillText(p.emoji,sx,sy-66);}}
     const hour=new Date().getUTCHours()+3;const nightAlpha=hour<6||hour>22?0.35:hour<8||hour>20?0.12:0;
