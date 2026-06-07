@@ -9,6 +9,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Разрешаем CORS для Render
+app.use((req, res, next) => {
+    const allowedOrigin = 'https://kysb-game.onrender.com';
+    const origin = req.headers.origin;
+    if (origin === allowedOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    }
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+});
+
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
