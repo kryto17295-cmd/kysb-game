@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KYSb Game</title>
+    <style>
+        * { margin: 0; padding: 0; }
+        body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { border: 2px solid #9b59b6; }
+    </style>
+</head>
+<body>
+<canvas id="game" width="800" height="600"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const socket = io();
+
+    const players = {};
+    const keys = {};
+    let myId = null;
+
+    const SPEED = 3;
+
+    document.addEventListener('keydown', e => keys[e.key] = true);
+    document.addEventListener('keyup', e => keys[e.key] = false);
+
+    socket.on('currentPlayers', (serverPlayers) => {
+        myId = socket.id;
+        Object.assign(players, serverPlayers);
+    });
+
+    socket.on('newPlayer', (data) => {
+        players[data.id] = { x: data.x, y: data.y, name: data.name };
+    });
+
+    socket.on('playerMoved', (data) => {
+        if (players[data.id]) {
+            players[data.id].x = data.x;
+            players[data.id].y = data.y;
+        }
+    });
+
+    socket.on('playerDisconnected', (id) => {
+        delete players[id];
+    });
+
+    function update() {
+        if (!myId || !players[myId]) return;
+
+        let moved = false;
+        if (keys['ArrowUp'] || keys['w'] || keys['W']) { players[myId].y -= SPEED; moved = true; }
+        if (keys['ArrowDown'] || keys['s'] || keys['S']) { players[myId].y += SPEED; moved = true; }
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) { players[myId].x -= SPEED; moved = true; }
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) { players[myId].x += SPEED; moved = true; }
+
+        if (moved) {
+            socket.emit('move', { x: players[myId].x, y: players[myId].y });
+        }
+    }
+
+    function draw() {
+        // Фон — тёмная карта с клетками
+        ctx.fillStyle = '#16213e';
+        ctx.fillRect(0, 0, 800, 600);
+
+        // Сетка
+        ctx.strokeStyle = '#1a2a4a';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 800; x += 40) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 600); ctx.stroke();
+        }
+        for (let y = 0; y < 600; y += 40) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke();
+        }
+
+        // Игроки
+        for (const id in players) {
+            const p = players[id];
+            const isMe = id === myId;
+
+            // Тело
+            ctx.fillStyle = isMe ? '#9b59b6' : '#e74c3c';
+            ctx.fillRect(p.x - 12, p.y - 20, 24, 28);
+
+            // Голова
+            ctx.fillStyle = isMe ? '#c39bd3' : '#f1948a';
+            ctx.fillRect(p.x - 8, p.y - 36, 16, 16);
+
+            // Ноги
+            ctx.fillStyle = isMe ? '#7d3c98' : '#c0392b';
+            ctx.fillRect(p.x - 10, p.y + 8, 8, 10);
+            ctx.fillRect(p.x + 2, p.y + 8, 8, 10);
+
+            // Имя
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(isMe ? 'Ты' : p.name, p.x, p.y - 42);
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+</script>
+</body>
+</html>
