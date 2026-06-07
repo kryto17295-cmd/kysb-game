@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const axios = require('axios');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,6 +13,14 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'kysb_secret';
+const MONGO_URI = process.env.MONGO_URI;
+
+// MongoDB
+let db;
+MongoClient.connect(MONGO_URI).then(client => {
+    db = client.db('discord_bot');
+    console.log('MongoDB подключена');
+}).catch(e => console.error('Ошибка MongoDB:', e));
 
 app.use(session({
     secret: SESSION_SECRET,
@@ -22,7 +31,8 @@ app.use(session({
 
 app.use(express.static('public'));
 
-// Discord авторизация
+// ─── Discord авторизация ──────────────────────────────────────
+
 app.get('/auth/login', (req, res) => {
     const url = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
     res.redirect(url);
@@ -63,12 +73,19 @@ app.get('/auth/callback', async (req, res) => {
     }
 });
 
-app.get('/auth/me', (req, res) => {
-    if (req.session.user) {
-        res.json(req.session.user);
-    } else {
-        res.json(null);
+app.get('/auth/me', async (req, res) => {
+    if (!req.session.user) return res.json(null);
+
+    const user = req.session.user;
+
+    // Берём баланс из MongoDB
+    let balance = 0;
+    if (db) {
+        const doc = await db.collection('voice_time').findOne({ _id: user.id });
+        balance = doc ? Math.floor(doc.seconds || 0) : 0;
     }
+
+    res.json({ ...user, balance });
 });
 
 app.get('/auth/logout', (req, res) => {
@@ -76,7 +93,8 @@ app.get('/auth/logout', (req, res) => {
     res.redirect('/');
 });
 
-// Игровой сервер
+// ─── Игровой сервер ───────────────────────────────────────────
+
 const players = {};
 
 io.on('connection', (socket) => {
@@ -86,7 +104,8 @@ io.on('connection', (socket) => {
         x: 400,
         y: 300,
         name: 'Игрок',
-        avatar: null
+        avatar: null,
+        balance: 0
     };
 
     socket.emit('currentPlayers', players);
@@ -96,7 +115,8 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             players[socket.id].name = data.name;
             players[socket.id].avatar = data.avatar;
-            io.emit('playerUpdated', { id: socket.id, name: data.name, avatar: data.avatar });
+            players[socket.id].balance = data.balance || 0;
+            io.emit('playerUpdated', { id: socket.id, name: data.name, avatar: data.avatar, balance: data.balance });
         }
     });
 

@@ -5,7 +5,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif; }
-        
+
         #login-screen {
             display: flex;
             flex-direction: column;
@@ -23,17 +23,54 @@
             border-radius: 8px;
             font-size: 18px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
         #login-btn:hover { background: #4752c4; }
 
         #game-screen { display: none; flex-direction: column; align-items: center; gap: 10px; }
-        #user-info { color: white; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+
+        #hud {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: white;
+            font-size: 14px;
+            width: 800px;
+            justify-content: space-between;
+        }
+        #user-info { display: flex; align-items: center; gap: 8px; }
         #user-info img { width: 32px; height: 32px; border-radius: 50%; }
-        #logout-btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        #balance-display {
+            background: #2c1654;
+            border: 1px solid #9b59b6;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 15px;
+            color: #d7b4f3;
+        }
+        #logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
         canvas { border: 2px solid #9b59b6; }
+
+        #zone-tooltip {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            display: none;
+            border: 1px solid #9b59b6;
+        }
     </style>
 </head>
 <body>
@@ -41,19 +78,22 @@
 <div id="login-screen">
     <h1>KYSb Game</h1>
     <p>Войди через Discord чтобы играть</p>
-    <button id="login-btn" onclick="window.location.href='/auth/login'">
-        🎮 Войти через Discord
-    </button>
+    <button id="login-btn" onclick="window.location.href='/auth/login'">🎮 Войти через Discord</button>
 </div>
 
 <div id="game-screen">
-    <div id="user-info">
-        <img id="user-avatar" src="" alt="">
-        <span id="user-name"></span>
+    <div id="hud">
+        <div id="user-info">
+            <img id="user-avatar" src="" alt="">
+            <span id="user-name"></span>
+        </div>
+        <div id="balance-display">💰 <span id="balance-val">0</span> кусиков</div>
         <button id="logout-btn" onclick="window.location.href='/auth/logout'">Выйти</button>
     </div>
     <canvas id="game" width="800" height="600"></canvas>
 </div>
+
+<div id="zone-tooltip"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -64,7 +104,13 @@
     const SPEED = 3;
     const avatarCache = {};
 
-    // Проверяем авторизацию
+    // Зоны на карте
+    const ZONES = [
+        { x: 50,  y: 50,  w: 160, h: 120, color: '#f1c40f', label: '🎰 Казино',  name: 'casino' },
+        { x: 590, y: 50,  w: 160, h: 120, color: '#2ecc71', label: '🛒 Магазин', name: 'shop' },
+        { x: 300, y: 450, w: 200, h: 120, color: '#e74c3c', label: '⚔️ PvP зона', name: 'pvp' },
+    ];
+
     fetch('/auth/me')
         .then(r => r.json())
         .then(user => {
@@ -73,10 +119,10 @@
                 document.getElementById('game-screen').style.display = 'flex';
                 document.getElementById('user-name').textContent = user.username;
                 document.getElementById('user-avatar').src = user.avatar;
+                document.getElementById('balance-val').textContent = user.balance;
                 startGame(user);
             } else {
                 document.getElementById('login-screen').style.display = 'flex';
-                document.getElementById('game-screen').style.display = 'none';
             }
         });
 
@@ -88,9 +134,17 @@
         return img;
     }
 
+    function getZoneAt(x, y) {
+        for (const z of ZONES) {
+            if (x > z.x && x < z.x + z.w && y > z.y && y < z.y + z.h) return z;
+        }
+        return null;
+    }
+
     function startGame(user) {
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('zone-tooltip');
         socket = io();
 
         document.addEventListener('keydown', e => keys[e.key] = true);
@@ -99,17 +153,18 @@
         socket.on('currentPlayers', (serverPlayers) => {
             myId = socket.id;
             Object.assign(players, serverPlayers);
-            socket.emit('setProfile', { name: user.username, avatar: user.avatar });
+            socket.emit('setProfile', { name: user.username, avatar: user.avatar, balance: user.balance });
         });
 
         socket.on('newPlayer', (data) => {
-            players[data.id] = { x: data.x, y: data.y, name: data.name, avatar: data.avatar };
+            players[data.id] = { x: data.x, y: data.y, name: data.name, avatar: data.avatar, balance: data.balance };
         });
 
         socket.on('playerUpdated', (data) => {
             if (players[data.id]) {
                 players[data.id].name = data.name;
                 players[data.id].avatar = data.avatar;
+                players[data.id].balance = data.balance;
             }
         });
 
@@ -127,11 +182,39 @@
         function update() {
             if (!myId || !players[myId]) return;
             let moved = false;
-            if (keys['ArrowUp'] || keys['w'] || keys['W'])    { players[myId].y -= SPEED; moved = true; }
-            if (keys['ArrowDown'] || keys['s'] || keys['S'])  { players[myId].y += SPEED; moved = true; }
-            if (keys['ArrowLeft'] || keys['a'] || keys['A'])  { players[myId].x -= SPEED; moved = true; }
+            if (keys['ArrowUp']    || keys['w'] || keys['W']) { players[myId].y -= SPEED; moved = true; }
+            if (keys['ArrowDown']  || keys['s'] || keys['S']) { players[myId].y += SPEED; moved = true; }
+            if (keys['ArrowLeft']  || keys['a'] || keys['A']) { players[myId].x -= SPEED; moved = true; }
             if (keys['ArrowRight'] || keys['d'] || keys['D']) { players[myId].x += SPEED; moved = true; }
+
+            // Границы карты
+            players[myId].x = Math.max(20, Math.min(780, players[myId].x));
+            players[myId].y = Math.max(20, Math.min(580, players[myId].y));
+
             if (moved) socket.emit('move', { x: players[myId].x, y: players[myId].y });
+
+            // Проверка зоны
+            const zone = getZoneAt(players[myId].x, players[myId].y);
+            if (zone) {
+                tooltip.textContent = `Вы в зоне: ${zone.label}`;
+                tooltip.style.display = 'block';
+            } else {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function drawZones(ctx) {
+            for (const z of ZONES) {
+                ctx.fillStyle = z.color + '33'; // прозрачный фон
+                ctx.fillRect(z.x, z.y, z.w, z.h);
+                ctx.strokeStyle = z.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(z.x, z.y, z.w, z.h);
+                ctx.fillStyle = z.color;
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(z.label, z.x + z.w / 2, z.y + z.h / 2);
+            }
         }
 
         function drawPlayer(ctx, p, isMe) {
@@ -146,7 +229,7 @@
             ctx.fillRect(x - 10, y + 8, 8, 10);
             ctx.fillRect(x + 2,  y + 8, 8, 10);
 
-            // Аватарка вместо головы
+            // Аватарка
             if (p.avatar) {
                 const img = loadAvatar(p.avatar);
                 if (img.complete) {
@@ -156,28 +239,32 @@
                     ctx.clip();
                     ctx.drawImage(img, x - 14, y - 42, 28, 28);
                     ctx.restore();
-                    // Обводка
                     ctx.beginPath();
                     ctx.arc(x, y - 28, 14, 0, Math.PI * 2);
                     ctx.strokeStyle = isMe ? '#9b59b6' : '#e74c3c';
                     ctx.lineWidth = 2;
                     ctx.stroke();
-                } else {
-                    ctx.fillStyle = isMe ? '#c39bd3' : '#f1948a';
-                    ctx.beginPath();
-                    ctx.arc(x, y - 28, 14, 0, Math.PI * 2);
-                    ctx.fill();
                 }
             }
 
             // Имя
-            ctx.fillStyle = 'white';
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 3;
             ctx.strokeText(p.name || 'Игрок', x, y - 48);
+            ctx.fillStyle = 'white';
             ctx.fillText(p.name || 'Игрок', x, y - 48);
+
+            // Баланс
+            if (p.balance > 0) {
+                ctx.font = '11px Arial';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 2;
+                ctx.strokeText(`💰 ${p.balance}`, x, y - 60);
+                ctx.fillStyle = '#f1c40f';
+                ctx.fillText(`💰 ${p.balance}`, x, y - 60);
+            }
         }
 
         function draw() {
@@ -193,6 +280,8 @@
             for (let y = 0; y < 600; y += 40) {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke();
             }
+
+            drawZones(ctx);
 
             for (const id in players) {
                 drawPlayer(ctx, players[id], id === myId);
