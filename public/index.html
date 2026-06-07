@@ -5,16 +5,11 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0a0a1a; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif; overflow: hidden; }
-
         #login-screen { display: flex; flex-direction: column; align-items: center; gap: 20px; color: white; }
         #login-screen h1 { font-size: 36px; color: #9b59b6; }
-        #login-screen p { color: #aaa; }
         #login-btn { background: #5865F2; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 18px; cursor: pointer; }
-        #login-btn:hover { background: #4752c4; }
-
         #game-screen { display: none; position: relative; }
         canvas { display: block; }
-
         #hud {
             position: absolute; top: 10px; left: 10px; right: 10px;
             display: flex; align-items: center; gap: 12px; color: white; font-size: 14px;
@@ -23,30 +18,90 @@
         #hud > * { pointer-events: auto; }
         #user-info { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 20px; }
         #user-info img { width: 32px; height: 32px; border-radius: 50%; }
-        #balance-display { background: rgba(44, 22, 84, 0.9); border: 1px solid #9b59b6; padding: 6px 14px; border-radius: 20px; color: #d7b4f3; }
-        #health-display { background: rgba(150, 30, 30, 0.9); border: 1px solid #e74c3c; padding: 6px 14px; border-radius: 20px; color: #f1948a; }
+        #balance-display { background: rgba(44,22,84,0.9); border: 1px solid #9b59b6; padding: 6px 14px; border-radius: 20px; color: #d7b4f3; }
+        #health-display { background: rgba(150,30,30,0.9); border: 1px solid #e74c3c; padding: 6px 14px; border-radius: 20px; color: #f1948a; }
         #logout-btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 
-        #chat-container { position: absolute; bottom: 10px; left: 10px; width: 320px; max-height: 120px; overflow-y: auto; z-index: 10; pointer-events: none; }
-        .chat-msg { color: white; font-size: 12px; text-shadow: 1px 1px 2px black; margin: 1px 0; opacity: 0.85; }
+        #chat-panel {
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+            width: 500px; z-index: 15; pointer-events: auto;
+        }
+        #chat-messages {
+            max-height: 80px; overflow-y: auto; margin-bottom: 4px;
+            font-size: 12px; color: white; text-shadow: 1px 1px 2px black;
+        }
+        .chat-msg { margin: 1px 0; opacity: 0.9; }
         .chat-name { color: #9b59b6; font-weight: bold; }
+        #chat-input {
+            width: 100%; padding: 6px 10px; border-radius: 12px; border: 1px solid #9b59b6;
+            background: rgba(0,0,0,0.8); color: white; font-size: 13px; outline: none;
+        }
 
-        #zone-tooltip { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 8px 16px; border-radius: 8px; font-size: 16px; display: none; z-index: 15; }
-        #fishing-ui { display: none; position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.95); color: white; padding: 20px 30px; border-radius: 16px; text-align: center; border: 2px solid #3498db; z-index: 20; }
+        #zone-tooltip { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 8px 16px; border-radius: 8px; font-size: 16px; display: none; z-index: 15; }
 
-        #shop-ui { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,10,5,0.97); color: #e8d5b0; padding: 20px; border-radius: 16px; border: 2px solid #8B5E1A; z-index: 25; width: 450px; max-height: 500px; overflow-y: auto; font-family: serif; }
-        #shop-ui h2 { text-align: center; font-size: 22px; margin-bottom: 15px; color: #f0c060; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #3d1f00; }
-        .shop-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: serif; }
-        .shop-btn:hover { background: #8B5E1A; }
+        #fishing-ui {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95); color: white; padding: 30px; border-radius: 16px;
+            text-align: center; border: 2px solid #3498db; z-index: 20; min-width: 350px;
+        }
+        #fishing-timer { font-size: 36px; margin: 15px 0; }
+        #fishing-pull-btn {
+            display: none; background: #2ecc71; color: white; border: none;
+            padding: 14px 30px; border-radius: 8px; font-size: 20px; cursor: pointer; margin: 10px;
+        }
+        #fishing-close-btn { background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
 
-        #tavern-ui { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 25; }
-        #dice-game { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 30; }
-        #dice-inner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2d1a00; border: 2px solid #8B5E1A; border-radius: 8px; padding: 30px; text-align: center; color: #e8d5b0; font-family: serif; width: 400px; }
+        #tavern-ui {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 25; width: 1000px; height: 650px; overflow-y: auto;
+            background: #1a0e05; border: 3px solid #8B5E1A; border-radius: 12px;
+        }
+        #tavern-inner {
+            width: 1280px; height: 800px; position: relative; overflow: hidden;
+            background: url('/tavern.png') center/cover;
+            transform: scale(0.78); transform-origin: top left;
+        }
+        #tavern-dialog {
+            position: absolute; top: 24px; left: 665px; width: 560px; height: 280px;
+            padding: 38px 45px; font-family: serif; font-size: 15px; color: #2a1500;
+            text-align: center; overflow: hidden; line-height: 1.5;
+        }
+        .tavern-btn {
+            position: absolute; left: 985px; width: 250px; height: 40px;
+            cursor: pointer; font-family: serif; font-size: 14px; color: #2a1500;
+            font-weight: bold; text-align: left; padding-left: 18px;
+            background: transparent; border: none;
+        }
+        #tavern-balance-display {
+            position: absolute; top: 748px; left: 740px; width: 530px; height: 44px;
+            display: flex; align-items: center; gap: 20px;
+            font-family: serif; font-size: 14px; color: #2a1500;
+        }
+        #tavern-close {
+            position: absolute; top: 758px; left: 580px; width: 130px; height: 32px;
+            cursor: pointer; font-family: serif; font-size: 14px; color: #8B1A00;
+            background: transparent; border: none; text-align: center;
+        }
+        #tavern-sell-panel {
+            display: none; position: absolute; top: 50px; left: 50px; width: 500px; max-height: 400px;
+            background: rgba(0,0,0,0.9); border: 2px solid #8B5E1A; border-radius: 8px;
+            padding: 20px; color: #e8d5b0; font-family: serif; z-index: 5; overflow-y: auto;
+        }
+        .sell-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #3d1f00; }
+        .sell-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-family: serif; }
+
+        #dice-game {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 30;
+        }
+        #dice-inner {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #2d1a00; border: 2px solid #8B5E1A; border-radius: 8px;
+            padding: 30px; text-align: center; color: #e8d5b0; font-family: serif; width: 400px;
+        }
         #dice-result { font-size: 48px; margin: 15px 0; }
         #dice-bet { width: 100px; padding: 5px; text-align: center; font-size: 16px; }
-        #dice-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-family: serif; font-size: 16px; margin: 5px; }
-        #dice-close { background: #8B1A00; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: serif; margin-top: 10px; }
+        .dice-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-family: serif; font-size: 16px; margin: 5px; }
     </style>
 </head>
 <body>
@@ -66,31 +121,31 @@
     </div>
     <canvas id="game"></canvas>
     <div id="zone-tooltip"></div>
-    <div id="chat-container"></div>
 
-    <div id="fishing-ui">
-        <div>🎣 Закидываем удочку...</div>
-        <button onclick="cancelFishing()" style="background:#e74c3c;color:white;border:none;padding:8px 16px;border-radius:6px;margin-top:10px;cursor:pointer;">✖ Отмена</button>
+    <div id="chat-panel">
+        <div id="chat-messages"></div>
+        <input id="chat-input" type="text" placeholder="Нажми Enter для чата...">
     </div>
 
-    <div id="shop-ui">
-        <h2>🛒 Магазин</h2>
-        <div id="shop-items"></div>
-        <button class="shop-btn" onclick="closeShop()" style="display:block;margin:15px auto 0;">Закрыть</button>
+    <div id="fishing-ui">
+        <div id="fishing-text">🎣 Закидываем удочку...</div>
+        <div id="fishing-timer">⏳ ...</div>
+        <button id="fishing-pull-btn" onclick="pullFish()">🎣 Тянуть!</button>
+        <button id="fishing-close-btn" onclick="closeFishing()">✖ Закрыть</button>
     </div>
 
     <div id="tavern-ui">
-        <div style="width:1280px;height:800px;position:relative;overflow:hidden;background:url('/tavern.png') center/cover;">
-            <div id="tavern-dialog" style="position:absolute;top:20px;left:665px;width:590px;height:290px;padding:40px 50px;font-family:serif;font-size:16px;color:#3d1f00;text-align:center;overflow:hidden;">Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?</div>
-            <div style="position:absolute;top:370px;left:980px;width:260px;height:44px;cursor:pointer;font-family:serif;font-size:15px;color:#3d1f00;font-weight:bold;text-align:left;padding-left:20px;" onclick="tavernAction('beer')">Выпить эль (10 кс)</div>
-            <div style="position:absolute;top:418px;left:980px;width:260px;height:44px;cursor:pointer;font-family:serif;font-size:15px;color:#3d1f00;font-weight:bold;text-align:left;padding-left:20px;" onclick="tavernAction('dice')">Сыграть в кости</div>
-            <div style="position:absolute;top:466px;left:980px;width:260px;height:44px;cursor:pointer;font-family:serif;font-size:15px;color:#3d1f00;font-weight:bold;text-align:left;padding-left:20px;" onclick="tavernAction('cards')">Сыграть в дурака</div>
-            <div style="position:absolute;top:514px;left:980px;width:260px;height:44px;cursor:pointer;font-family:serif;font-size:15px;color:#3d1f00;font-weight:bold;text-align:left;padding-left:20px;" onclick="tavernAction('room')">Снять комнату (50 кс)</div>
-            <div style="position:absolute;top:562px;left:980px;width:260px;height:44px;cursor:pointer;font-family:serif;font-size:15px;color:#3d1f00;font-weight:bold;text-align:left;padding-left:20px;" onclick="tavernAction('quests')">Доска заданий</div>
-            <div style="position:absolute;top:755px;left:580px;width:140px;height:35px;cursor:pointer;font-family:serif;font-size:14px;color:#8B1A00;text-align:center;" onclick="closeTavern()">Уйти из таверны</div>
-            <div style="position:absolute;top:748px;left:740px;width:530px;height:44px;display:flex;align-items:center;gap:20px;font-family:serif;font-size:14px;color:#3d1f00;">
-                💰 <span id="tavern-balance">0</span> кс &nbsp; ❤️ <span id="tavern-health">100</span>/100
-            </div>
+        <div id="tavern-inner">
+            <div id="tavern-dialog">Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?</div>
+            <button class="tavern-btn" style="top:372px;" onclick="tavernAction('beer')">Выпить эль (10 кс)</button>
+            <button class="tavern-btn" style="top:419px;" onclick="tavernAction('dice')">Сыграть в кости</button>
+            <button class="tavern-btn" style="top:466px;" onclick="tavernAction('cards')">Сыграть в дурака</button>
+            <button class="tavern-btn" style="top:513px;" onclick="tavernAction('room')">Снять комнату (50 кс)</button>
+            <button class="tavern-btn" style="top:560px;" onclick="tavernAction('quests')">Доска заданий</button>
+            <button class="tavern-btn" style="top:607px;" onclick="tavernAction('sell')">Продать рыбу</button>
+            <div id="tavern-balance-display">💰 <span id="tavern-balance">0</span> кс &nbsp; ❤️ <span id="tavern-health">100</span>/100</div>
+            <button id="tavern-close" onclick="closeTavern()">Уйти из таверны</button>
+            <div id="tavern-sell-panel"></div>
         </div>
     </div>
 
@@ -99,8 +154,8 @@
             <h3>🎲 Кости</h3>
             <div id="dice-result">🎲 🎲</div>
             <div>Ставка: <input type="number" id="dice-bet" min="10" value="10" step="10"> кс</div><br>
-            <button id="dice-btn" onclick="rollDice()">Бросить кости</button><br>
-            <button id="dice-close" onclick="closeDice()">Закрыть</button>
+            <button class="dice-btn" onclick="rollDice()">Бросить кости</button><br>
+            <button class="dice-btn" onclick="closeDice()" style="background:#8B1A00;">Закрыть</button>
             <div id="dice-outcome" style="margin-top:10px;font-weight:bold;"></div>
         </div>
     </div>
@@ -118,9 +173,10 @@
     const keys = {};
     const avatarCache = {}, textureCache = {};
     let camera = { x: 0, y: 0 }, currentUser = null, mapData = null;
-    let fishingActive = false, shopOpen = false, tavernOpen = false, mySpeed = 4;
+    let fishingActive = false, tavernOpen = false, mySpeed = 4;
     let chatMessages = [];
     let offscreenCanvas, offscreenCtx;
+    let fishingTimeout = null, pullTimeout = null, canPull = false;
 
     function loadTexture(src) {
         if (textureCache[src]) return textureCache[src];
@@ -137,7 +193,6 @@
         offscreenCanvas.width = mapData.mapW;
         offscreenCanvas.height = mapData.mapH;
         offscreenCtx = offscreenCanvas.getContext('2d');
-
         const grass = loadTexture('/grass.png');
         for (let gy = 0; gy < mapData.mapH; gy += 32) {
             for (let gx = 0; gx < mapData.mapW; gx += 32) {
@@ -145,28 +200,21 @@
                 else { offscreenCtx.fillStyle = ((gx/32)+(gy/32))%2===0?'#2d5a27':'#2a5424'; offscreenCtx.fillRect(gx,gy,32,32); }
             }
         }
-
         const pathImg = loadTexture('/path.png');
         for (const r of mapData.roadTiles) {
             if (pathImg.complete) offscreenCtx.drawImage(pathImg, r.x, r.y, 32, 32);
             else { offscreenCtx.fillStyle = '#c8a96e'; offscreenCtx.fillRect(r.x, r.y, 32, 32); }
         }
-
         const treeImg = loadTexture('/tree.png'), bushImg = loadTexture('/kyst.png');
         for (const t of mapData.trees) {
             const img = t.type === 'tree' ? treeImg : bushImg;
             if (img.complete) offscreenCtx.drawImage(img, t.x - 16, t.y - 24, 32, 32);
         }
-
-        const casinoImg = loadTexture('/casino.png'), shopImg = loadTexture('/shop.png'), tavernImg = loadTexture('/tavern.png');
+        const casinoImg = loadTexture('/casino.png'), tavernImg = loadTexture('/tavern.png');
         for (const b of mapData.buildings) {
-            let img;
-            if (b.type === 'casino') img = casinoImg;
-            else if (b.type === 'shop') img = shopImg;
-            else img = tavernImg;
+            const img = b.type === 'casino' ? casinoImg : tavernImg;
             if (img.complete) offscreenCtx.drawImage(img, b.x, b.y, b.w, b.h);
         }
-
         const waterImg = loadTexture('/water.png');
         for (const z of mapData.fishingZones) {
             for (let wy = z.y; wy < z.y + z.h; wy += 32) {
@@ -193,32 +241,51 @@
     function startGame(user) {
         socket = io();
         document.addEventListener('keydown', e => {
-            if (tavernOpen || shopOpen) return;
+            if (tavernOpen) return;
+            if (document.activeElement === document.getElementById('chat-input')) {
+                if (e.code === 'Enter') {
+                    const input = document.getElementById('chat-input');
+                    if (input.value.trim()) {
+                        socket.emit('chatMessage', { text: input.value.trim() });
+                        input.value = '';
+                    }
+                    input.blur();
+                }
+                return;
+            }
             keys[e.code] = true;
-            if (e.code === 'KeyF') startFishing();
-            if (e.code === 'KeyE') {
+            if (e.code === 'KeyF' && !fishingActive) startFishing();
+            if (e.code === 'KeyE' && !fishingActive) {
                 const me = players[myId];
                 if (me && mapData) {
                     for (const b of mapData.buildings) {
                         if (me.x > b.x && me.x < b.x + b.w && me.y > b.y && me.y < b.y + b.h) {
-                            if (b.type === 'shop') openShop();
                             if (b.type === 'tavern') openTavern();
                             break;
                         }
                     }
-                    if (!tavernOpen && !shopOpen) {
-                        const emojis = ['😊','😂','🎉','💀','🔥','💜','🐟','☕','🎣','💰'];
-                        socket.emit('emoji', { emoji: emojis[Math.floor(Math.random() * emojis.length)] });
+                    if (!tavernOpen) {
+                        socket.emit('emoji', { emoji: ['😊','😂','🎉','💀','🔥','💜','🐟','☕','🎣','💰'][Math.floor(Math.random()*10)] });
                     }
                 }
             }
-            if (e.code === 'Enter') {
-                const input = prompt('Чат:');
-                if (input && input.trim()) socket.emit('chatMessage', { text: input.trim() });
-            }
+            if (e.code === 'Enter') { document.getElementById('chat-input').focus(); }
             if (e.code === 'KeyC') socket.emit('drinkCoffee');
+            if (e.code === 'Escape') closeFishing();
         });
         document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+        document.getElementById('chat-input').addEventListener('keydown', e => {
+            if (e.code === 'Enter') {
+                const input = document.getElementById('chat-input');
+                if (input.value.trim()) {
+                    socket.emit('chatMessage', { text: input.value.trim() });
+                    input.value = '';
+                }
+                input.blur();
+            }
+            e.stopPropagation();
+        });
 
         socket.on('mapData', (data) => {
             mapData = data;
@@ -242,38 +309,55 @@
                 if (data.balance !== undefined) players[data.id].balance = data.balance;
                 if (data.inventory) players[data.id].inventory = data.inventory;
                 if (data.health !== undefined) players[data.id].health = data.health;
-                if (data.house) players[data.id].house = data.house;
             }
         });
         socket.on('playerMoved', (data) => {
             if (players[data.id]) {
-                players[data.id].tx = data.x; players[data.id].ty = data.y; players[data.id].dir = data.dir;
+                players[data.id].tx = data.x; players[data.id].ty = data.y;
             }
         });
         socket.on('playerDisconnected', (id) => { delete players[id]; });
         socket.on('playerEmoji', (data) => { if (players[data.id]) { players[data.id].emoji = data.emoji; players[data.id].emojiTime = Date.now(); } });
         socket.on('chatMessage', (data) => {
             chatMessages.push({ name: data.name, text: data.text, time: Date.now() });
-            if (chatMessages.length > 15) chatMessages.shift();
+            if (chatMessages.length > 20) chatMessages.shift();
         });
 
-        socket.on('fishingError', (data) => { alert(data.message); });
-        socket.on('fishingStarted', () => { fishingActive = true; document.getElementById('fishing-ui').style.display = 'block'; });
+        socket.on('fishingStarted', () => {
+            fishingActive = true;
+            const fishingUI = document.getElementById('fishing-ui');
+            fishingUI.style.display = 'block';
+            document.getElementById('fishing-text').textContent = '🎣 Закидываем удочку...';
+            document.getElementById('fishing-timer').textContent = '⏳ Ждём...';
+            document.getElementById('fishing-pull-btn').style.display = 'none';
+            canPull = false;
+            const waitTime = 3000 + Math.random() * 7000;
+            fishingTimeout = setTimeout(() => {
+                document.getElementById('fishing-text').textContent = '🎣 Клюёт! Тяни!';
+                document.getElementById('fishing-timer').textContent = '⚡ ЖМИ ТЯНУТЬ!';
+                document.getElementById('fishing-pull-btn').style.display = 'inline-block';
+                canPull = true;
+                pullTimeout = setTimeout(() => {
+                    if (canPull) {
+                        socket.emit('fishResult', { caught: false });
+                        closeFishing();
+                    }
+                }, 2000);
+            }, waitTime);
+        });
+
         socket.on('fishCaught', (data) => {
-            fishingActive = false; document.getElementById('fishing-ui').style.display = 'none';
             document.getElementById('balance-val').textContent = data.balance;
             alert(`🎣 Поймал: ${data.fish}! +${data.price} кс`);
+            closeFishing();
         });
         socket.on('fishLost', (data) => {
-            fishingActive = false; document.getElementById('fishing-ui').style.display = 'none';
             alert(`😢 ${data.fish} сорвался!`);
+            closeFishing();
         });
-        socket.on('fishSold', (data) => {
-            document.getElementById('balance-val').textContent = data.balance;
-        });
+        socket.on('fishSold', (data) => { document.getElementById('balance-val').textContent = data.balance; });
         socket.on('housePlaced', (data) => {
             if (mapData) mapData.houses[data.ownerId] = data.house;
-            if (players[myId]) { players[myId].balance = data.balance; players[myId].house = data.house; }
             document.getElementById('balance-val').textContent = data.balance;
             buildOffscreenMap();
         });
@@ -285,29 +369,29 @@
         gameLoop();
     }
 
-    function startFishing() { if (!fishingActive && !shopOpen && !tavernOpen) socket.emit('startFishing'); }
-    function cancelFishing() { fishingActive = false; document.getElementById('fishing-ui').style.display = 'none'; socket.emit('cancelFishing'); }
-
-    function openShop() {
-        if (!currentUser || !players[myId]) return;
-        shopOpen = true;
-        const inv = players[myId].inventory || [];
-        let html = '<h2>🛒 Магазин</h2>';
-        if (inv.length === 0) html += '<p style="color:#aaa;">Инвентарь пуст. Поймай рыбу!</p>';
-        else {
-            for (let i = 0; i < inv.length; i++) {
-                html += `<div class="shop-item"><span>${inv[i].name}</span><span>${inv[i].price} кс</span><button class="shop-btn" onclick="sellFish(${i})">Продать</button></div>`;
-            }
-        }
-        html += '<button class="shop-btn" onclick="closeShop()" style="display:block;margin:15px auto 0;">Закрыть</button>';
-        document.getElementById('shop-ui').innerHTML = html;
-        document.getElementById('shop-ui').style.display = 'block';
+    function startFishing() {
+        if (fishingActive || tavernOpen) return;
+        const me = players[myId];
+        if (!me || !mapData) return;
+        const inZone = mapData.fishingZones.some(z => me.x > z.x && me.x < z.x + z.w && me.y > z.y && me.y < z.y + z.h);
+        if (!inZone) { alert('Нужно быть у водоёма!'); return; }
+        socket.emit('startFishing');
     }
-    function closeShop() { shopOpen = false; document.getElementById('shop-ui').style.display = 'none'; }
-    function sellFish(idx) {
-        const inv = players[myId]?.inventory;
-        if (!inv || idx >= inv.length) return;
-        socket.emit('sellFish', { fishName: inv[idx].name, price: inv[idx].price });
+
+    function pullFish() {
+        if (!canPull) return;
+        canPull = false;
+        if (pullTimeout) clearTimeout(pullTimeout);
+        socket.emit('fishResult', { caught: true });
+    }
+
+    function closeFishing() {
+        fishingActive = false;
+        document.getElementById('fishing-ui').style.display = 'none';
+        document.getElementById('fishing-pull-btn').style.display = 'none';
+        if (fishingTimeout) clearTimeout(fishingTimeout);
+        if (pullTimeout) clearTimeout(pullTimeout);
+        canPull = false;
     }
 
     function openTavern() {
@@ -317,8 +401,14 @@
         document.getElementById('tavern-balance').textContent = p?.balance || 0;
         document.getElementById('tavern-health').textContent = p?.health || 100;
         document.getElementById('tavern-dialog').textContent = 'Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?';
+        document.getElementById('tavern-sell-panel').style.display = 'none';
     }
-    function closeTavern() { tavernOpen = false; document.getElementById('tavern-ui').style.display = 'none'; document.getElementById('dice-game').style.display = 'none'; }
+
+    function closeTavern() {
+        tavernOpen = false;
+        document.getElementById('tavern-ui').style.display = 'none';
+        document.getElementById('dice-game').style.display = 'none';
+    }
 
     function tavernAction(action) {
         const p = players[myId]; if (!p) return;
@@ -327,11 +417,7 @@
             case 'beer':
                 if (p.balance < 10) { d.textContent = 'Не хватает кусиков!'; return; }
                 p.balance -= 10; p.health = Math.min(100, p.health + 20);
-                socket.emit('setProfile', { ...currentUser, balance: p.balance, health: p.health, discordId: p.discordId, inventory: p.inventory, house: p.house });
-                document.getElementById('balance-val').textContent = p.balance;
-                document.getElementById('health-val').textContent = p.health;
-                document.getElementById('tavern-balance').textContent = p.balance;
-                document.getElementById('tavern-health').textContent = p.health;
+                updateStats();
                 d.textContent = 'Васыль наливает тебе эль. -10 кс, +20 здоровья.';
                 break;
             case 'dice': document.getElementById('dice-game').style.display = 'block'; break;
@@ -339,18 +425,45 @@
             case 'room':
                 if (p.balance < 50) { d.textContent = 'Не хватает кусиков!'; return; }
                 p.balance -= 50; p.health = 100;
-                socket.emit('setProfile', { ...currentUser, balance: p.balance, health: p.health, discordId: p.discordId, inventory: p.inventory, house: p.house });
-                document.getElementById('balance-val').textContent = p.balance;
-                document.getElementById('health-val').textContent = 100;
-                document.getElementById('tavern-balance').textContent = p.balance;
-                document.getElementById('tavern-health').textContent = 100;
+                updateStats();
                 d.textContent = 'Васыль даёт ключ. -50 кс, здоровье 100.';
                 break;
             case 'quests':
                 const qs = ['Поймай 5 рыб — 100 кс','Посади дерево — 50 кс','Выпей 3 эля — 30 кс','Построй домик — 200 кс','Сыграй в кости 5 раз — 80 кс'];
                 d.textContent = '📜 Задания:\n• ' + [qs[Math.floor(Math.random()*5)], qs[Math.floor(Math.random()*5)], qs[Math.floor(Math.random()*5)]].join('\n• ');
                 break;
+            case 'sell':
+                const inv = p.inventory || [];
+                const panel = document.getElementById('tavern-sell-panel');
+                if (inv.length === 0) {
+                    panel.innerHTML = '<p>Инвентарь пуст. Поймай рыбу!</p>';
+                } else {
+                    let html = '<h3>Продажа рыбы</h3>';
+                    inv.forEach((item, i) => {
+                        html += `<div class="sell-item"><span>${item.name}</span><span>${item.price} кс</span><button class="sell-btn" onclick="sellFish(${i})">Продать</button></div>`;
+                    });
+                    panel.innerHTML = html;
+                }
+                panel.style.display = 'block';
+                break;
         }
+    }
+
+    function sellFish(idx) {
+        const inv = players[myId]?.inventory;
+        if (!inv || idx >= inv.length) return;
+        socket.emit('sellFish', { fishName: inv[idx].name, price: inv[idx].price });
+        document.getElementById('tavern-sell-panel').style.display = 'none';
+        document.getElementById('tavern-dialog').textContent = 'Рыба продана!';
+    }
+
+    function updateStats() {
+        const p = players[myId];
+        document.getElementById('balance-val').textContent = p.balance;
+        document.getElementById('health-val').textContent = p.health;
+        document.getElementById('tavern-balance').textContent = p.balance;
+        document.getElementById('tavern-health').textContent = p.health;
+        socket.emit('setProfile', { ...currentUser, balance: p.balance, health: p.health, discordId: p.discordId, inventory: p.inventory, house: p.house });
     }
 
     function rollDice() {
@@ -359,6 +472,7 @@
         const result = document.getElementById('dice-result'), outcome = document.getElementById('dice-outcome');
         let count = 0;
         const interval = setInterval(() => {
+            result.textContent = '🎲 🎲';
             result.textContent = ['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)] + ' ' + ['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)];
             if (++count > 10) {
                 clearInterval(interval);
@@ -367,39 +481,33 @@
                 result.textContent = `Ты: ${ps}  CPU: ${cs}`;
                 if (ps > cs) { p.balance += bet; outcome.textContent = `Победа! +${bet} кс`; }
                 else { p.balance -= bet; outcome.textContent = `Поражение! -${bet} кс`; }
-                document.getElementById('balance-val').textContent = p.balance;
-                document.getElementById('tavern-balance').textContent = p.balance;
-                socket.emit('setProfile', { ...currentUser, balance: p.balance, health: p.health, discordId: p.discordId, inventory: p.inventory, house: p.house });
+                updateStats();
             }
         }, 80);
     }
     function closeDice() { document.getElementById('dice-game').style.display = 'none'; }
 
     function update() {
-        if (!myId || !players[myId] || tavernOpen || shopOpen) return;
+        if (!myId || !players[myId] || tavernOpen) return;
         const me = players[myId];
         let dx = 0, dy = 0, moved = false;
         if (keys['KeyW'] || keys['ArrowUp'])    { dy = -mySpeed; moved = true; me.dir = 'up'; }
         if (keys['KeyS'] || keys['ArrowDown'])  { dy = mySpeed;  moved = true; me.dir = 'down'; }
         if (keys['KeyA'] || keys['ArrowLeft'])  { dx = -mySpeed; moved = true; me.dir = 'left'; }
         if (keys['KeyD'] || keys['ArrowRight']) { dx = mySpeed;  moved = true; me.dir = 'right'; }
-
         if (moved) {
             me.x = Math.max(10, Math.min((mapData?.mapW || 2400) - 10, me.x + dx));
             me.y = Math.max(10, Math.min((mapData?.mapH || 1800) - 10, me.y + dy));
             socket.emit('move', { x: me.x, y: me.y, dir: me.dir });
         }
-
         for (const id in players) {
             if (id === myId) continue;
             const p = players[id];
             if (p.tx) { p.x += (p.tx - p.x) * 0.25; if (Math.abs(p.tx - p.x) < 0.5) p.x = p.tx; }
             if (p.ty) { p.y += (p.ty - p.y) * 0.25; if (Math.abs(p.ty - p.y) < 0.5) p.y = p.ty; }
         }
-
         camera.x += (me.x - canvas.width / 2 - camera.x) * 0.1;
         camera.y += (me.y - canvas.height / 2 - camera.y) * 0.1;
-
         if (mapData) {
             const tooltip = document.getElementById('zone-tooltip');
             let text = '';
@@ -416,19 +524,14 @@
 
     function draw() {
         if (!mapData) { ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0,0,canvas.width,canvas.height); return; }
-
         if (offscreenCanvas) {
             ctx.drawImage(offscreenCanvas, camera.x, camera.y, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
         }
-
-        // Здания (поверх карты)
         for (const b of mapData.buildings) {
             const sx = b.x - camera.x, sy = b.y - camera.y;
-            ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center';
-            ctx.fillStyle = 'white'; ctx.fillText(b.label, sx + b.w / 2, sy - 8);
+            ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
+            ctx.fillStyle = 'white'; ctx.fillText(b.label, sx + b.w / 2, sy - 6);
         }
-
-        // Домики
         if (mapData.houses) {
             const houseImg = loadTexture('/stone.png');
             for (const [oid, h] of Object.entries(mapData.houses)) {
@@ -439,8 +542,6 @@
                 ctx.fillText(h.owner || 'Домик', sx, sy - 35);
             }
         }
-
-        // Игроки
         for (const id in players) {
             const p = players[id];
             const sx = p.x - camera.x, sy = p.y - camera.y;
@@ -463,26 +564,22 @@
             ctx.strokeText(p.name || 'Игрок', sx, sy - 48);
             ctx.fillStyle = 'white'; ctx.fillText(p.name || 'Игрок', sx, sy - 48);
             if (p.balance > 0) {
-                ctx.font = '11px Arial';
+                ctx.font = '10px Arial';
                 ctx.strokeStyle = 'black'; ctx.lineWidth = 2;
-                ctx.strokeText('💰'+p.balance, sx, sy-60);
-                ctx.fillStyle = '#f1c40f'; ctx.fillText('💰'+p.balance, sx, sy-60);
+                ctx.strokeText('💰'+p.balance, sx, sy-58);
+                ctx.fillStyle = '#f1c40f'; ctx.fillText('💰'+p.balance, sx, sy-58);
             }
             if (p.emoji && Date.now() - (p.emojiTime||0) < 3000) {
-                ctx.font = '24px Arial'; ctx.textAlign = 'center';
-                ctx.fillText(p.emoji, sx, sy - 70);
+                ctx.font = '22px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(p.emoji, sx, sy - 68);
             }
         }
-
-        // Ночь
         const hour = new Date().getUTCHours() + 3;
         const nightAlpha = hour < 6 || hour > 22 ? 0.35 : hour < 8 || hour > 20 ? 0.12 : 0;
         if (nightAlpha > 0) {
             ctx.fillStyle = `rgba(10, 10, 40, ${nightAlpha})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-
-        // Фонари
         if (nightAlpha > 0.08 && mapData.lamps) {
             for (const l of mapData.lamps) {
                 const sx = l.x - camera.x, sy = l.y - camera.y;
@@ -495,13 +592,13 @@
                 }
             }
         }
-
-        // Чат
         const now = Date.now();
         chatMessages = chatMessages.filter(m => now - m.time < 8000);
-        document.getElementById('chat-container').innerHTML = chatMessages.map(m =>
+        document.getElementById('chat-messages').innerHTML = chatMessages.map(m =>
             `<div class="chat-msg"><span class="chat-name">${m.name}:</span> ${m.text}</div>`
         ).join('');
+        const chatDiv = document.getElementById('chat-messages');
+        chatDiv.scrollTop = chatDiv.scrollHeight;
     }
 
     function gameLoop() {
