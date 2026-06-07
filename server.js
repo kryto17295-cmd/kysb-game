@@ -38,8 +38,7 @@ MongoClient.connect(MONGO_URI).then(client => {
 app.use(session({
     secret: SESSION_SECRET,
     resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false }
+    saveUninitialized: false
 }));
 
 app.use(express.static('public'));
