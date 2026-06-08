@@ -1,377 +1,252 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const session = require('express-session');
-const axios = require('axios');
-const { MongoClient } = require('mongodb');
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KYSb Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0a1a; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif; overflow: hidden; }
+        #login-screen { display: flex; flex-direction: column; align-items: center; gap: 20px; color: white; }
+        #login-screen h1 { font-size: 36px; color: #9b59b6; }
+        #login-btn { background: #5865F2; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 18px; cursor: pointer; }
+        #game-screen { display: none; position: relative; }
+        canvas { display: block; }
+        #hud {
+            position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 10px; color: white; font-size: 13px;
+            z-index: 10; pointer-events: none; background: rgba(0,0,0,0.75);
+            padding: 6px 14px; border-radius: 20px; white-space: nowrap;
+        }
+        #hud > * { pointer-events: auto; }
+        #user-info { display: flex; align-items: center; gap: 6px; }
+        #user-info img { width: 28px; height: 28px; border-radius: 50%; }
+        #balance-display { color: #d7b4f3; }
+        #health-display { color: #f1948a; }
+        #logout-btn { background: #e74c3c; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        #chat-panel { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 460px; z-index: 15; }
+        #chat-messages { max-height: 72px; overflow-y: auto; margin-bottom: 3px; font-size: 11px; color: white; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.5); border-radius: 6px; padding: 4px 8px; }
+        .chat-msg { margin: 1px 0; opacity: 0.9; }
+        .chat-name { color: #9b59b6; font-weight: bold; }
+        #chat-input { width: 100%; padding: 5px 8px; border-radius: 10px; border: 1px solid #9b59b6; background: rgba(0,0,0,0.75); color: white; font-size: 12px; outline: none; }
+        #zone-tooltip { position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 6px 14px; border-radius: 8px; font-size: 14px; display: none; z-index: 15; }
+        #fishing-ui { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); color: white; padding: 24px; border-radius: 14px; text-align: center; border: 2px solid #3498db; z-index: 20; min-width: 300px; }
+        #fishing-text { font-size: 18px; margin-bottom: 10px; }
+        #fishing-timer { font-size: 28px; margin: 10px 0; }
+        #fishing-pull-btn { display: none; background: #2ecc71; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 18px; cursor: pointer; margin: 8px; }
+        #fishing-close-btn { background: #e74c3c; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+        #tavern-ui {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 25; width: 1280px; height: 800px;
+            background: url('/tavern.png') center/cover no-repeat;
+            border: 3px solid #8B5E1A; border-radius: 12px; overflow: hidden;
+        }
+        #tavern-dialog {
+            position: absolute; top: 24px; left: 665px; width: 560px; height: 280px;
+            padding: 38px 45px; font-family: serif; font-size: 15px; color: #2a1500;
+            text-align: center; overflow: hidden; line-height: 1.5;
+        }
+        .tavern-btn {
+            position: absolute; left: 920px; width: 250px; height: 40px;
+            background: transparent; border: none; cursor: pointer;
+            font-family: serif; font-size: 14px; color: #2a1500;
+            font-weight: bold; text-align: left; padding-left: 18px;
+        }
+        .tavern-btn:hover { color: #8B1A00; }
+        #tavern-stats {
+            position: absolute; top: 748px; left: 740px; width: 530px; height: 44px;
+            display: flex; align-items: center; gap: 20px;
+            font-family: serif; font-size: 14px; color: #2a1500;
+        }
+        #tavern-close {
+            position: absolute; top: 758px; left: 580px; width: 130px; height: 32px;
+            font-family: serif; font-size: 14px; color: #8B1A00;
+            background: transparent; border: none; cursor: pointer;
+        }
+        #tavern-sell-panel {
+            display: none; position: absolute; top: 50px; left: 50px;
+            width: 500px; max-height: 400px;
+            background: rgba(0,0,0,0.9); border: 2px solid #8B5E1A; border-radius: 8px;
+            padding: 20px; color: #e8d5b0; font-family: serif; overflow-y: auto;
+        }
+        .sell-item { display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #3d1f00; font-size: 13px; }
+        .sell-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-family: serif; font-size: 12px; }
+        #dice-game { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 30; }
+        #dice-inner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2d1a00; border: 2px solid #8B5E1A; border-radius: 8px; padding: 24px; text-align: center; color: #e8d5b0; font-family: serif; width: 360px; }
+        #dice-result { font-size: 40px; margin: 12px 0; }
+        #dice-bet { width: 90px; padding: 4px; text-align: center; font-size: 15px; }
+        .dice-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: serif; font-size: 15px; margin: 4px; }
+    </style>
+</head>
+<body>
+<div id="login-screen"><h1>KYSb Game</h1><p>Войди через Discord чтобы играть</p><button id="login-btn" onclick="location.href='/auth/login'">🎮 Войти через Discord</button></div>
+<div id="game-screen">
+    <div id="hud">
+        <div id="user-info"><img id="user-avatar" src=""><span id="user-name"></span></div>
+        <div id="balance-display">💰 <span id="balance-val">0</span></div>
+        <div id="health-display">❤️ <span id="health-val">100</span></div>
+        <button id="logout-btn" onclick="location.href='/auth/logout'">Выйти</button>
+    </div>
+    <canvas id="game"></canvas>
+    <div id="zone-tooltip"></div>
+    <div id="chat-panel"><div id="chat-messages"></div><input id="chat-input" type="text" placeholder="Чат (Enter)"></div>
+    <div id="fishing-ui"><div id="fishing-text">🎣 Закидываем удочку...</div><div id="fishing-timer">⏳ ...</div><button id="fishing-pull-btn" onclick="pullFish()">🎣 Тянуть!</button><button id="fishing-close-btn" onclick="closeFishing()">✖ Закрыть</button></div>
+    <div id="tavern-ui">
+        <div id="tavern-dialog">Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?</div>
+        <button class="tavern-btn" onclick="tavernAction('beer')" style="top:372px;">Выпить эль (10 кс)</button>
+        <button class="tavern-btn" onclick="tavernAction('dice')" style="top:419px;">Сыграть в кости</button>
+        <button class="tavern-btn" onclick="tavernAction('room')" style="top:466px;">Снять комнату (50 кс)</button>
+        <button class="tavern-btn" onclick="tavernAction('sell')" style="top:513px;">Продать рыбу</button>
+        <div id="tavern-stats">💰 <span id="tavern-balance">0</span> кс &nbsp; ❤️ <span id="tavern-health">100</span>/100</div>
+        <button id="tavern-close" onclick="closeTavern()">Уйти из таверны</button>
+        <div id="tavern-sell-panel"></div>
+    </div>
+    <div id="dice-game"><div id="dice-inner"><h3>🎲 Кости</h3><div id="dice-result">🎲 🎲</div><div>Ставка: <input type="number" id="dice-bet" min="10" value="10" step="10"> кс</div><br><button class="dice-btn" onclick="rollDice()">Бросить</button><button class="dice-btn" onclick="closeDice()" style="background:#8B1A00;">Закрыть</button><div id="dice-outcome" style="margin-top:8px;font-weight:bold;"></div></div></div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+let socket,myId=null,players={},keys={},avatarCache={},textureCache={};
+let camera={x:0,y:0},currentUser=null,mapData=null;
+let fishingActive=false,tavernOpen=false,mySpeed=4;
+let chatMessages=[],offscreenCanvas,offscreenCtx,fishingReady=false,canPull=false;
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+function loadTexture(src){if(textureCache[src])return textureCache[src];const img=new Image();img.src=src;textureCache[src]=img;return img;}
+function loadAvatar(url){if(avatarCache[url])return avatarCache[url];const img=new Image();img.src=url;avatarCache[url]=img;return img;}
 
-// Разрешаем CORS для Render
-app.use((req, res, next) => {
-    const allowedOrigin = 'https://kysb-game.onrender.com';
-    const origin = req.headers.origin;
-    if (origin === allowedOrigin) {
-        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+function buildOffscreenMap(){
+    if(!mapData)return;
+    offscreenCanvas=document.createElement('canvas');
+    offscreenCanvas.width=mapData.mapW;offscreenCanvas.height=mapData.mapH;
+    offscreenCtx=offscreenCanvas.getContext('2d');
+    const grass=loadTexture('/grass.png');
+    for(let gy=0;gy<mapData.mapH;gy+=32)for(let gx=0;gx<mapData.mapW;gx+=32){
+        if(grass.complete)offscreenCtx.drawImage(grass,gx,gy,32,32);
+        else{offscreenCtx.fillStyle=((gx/32)+(gy/32))%2===0?'#2d5a27':'#2a5424';offscreenCtx.fillRect(gx,gy,32,32);}
     }
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
-});
-
-const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
-const SESSION_SECRET = process.env.SESSION_SECRET || 'kysb_secret';
-const MONGO_URI = process.env.MONGO_URI;
-
-const MAP_W = 2400;
-const MAP_H = 1800;
-
-let db;
-MongoClient.connect(MONGO_URI).then(client => {
-    db = client.db('discord_bot');
-    console.log('MongoDB подключена');
-}).catch(e => console.error('Ошибка MongoDB:', e));
-
-app.use(session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false
-}));
-
-app.use(express.static('public'));
-
-// Прогрев сервера (чтобы Render не засыпал)
-app.get('/ping', (req, res) => {
-    res.send('ok');
-});
-
-app.get('/auth/login', (req, res) => {
-    const url = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
-    res.redirect(url);
-});
-
-app.get('/auth/callback', async (req, res) => {
-    const code = req.query.code;
-    if (!code) return res.redirect('/');
-    try {
-        const tokenRes = await axios.post('https://discord.com/api/oauth2/token',
-            new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI }),
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-        const userRes = await axios.get('https://discord.com/api/users/@me', {
-            headers: { Authorization: `Bearer ${tokenRes.data.access_token}` }
-        });
-        req.session.user = {
-            id: userRes.data.id,
-            username: userRes.data.username,
-            avatar: userRes.data.avatar ? `https://cdn.discordapp.com/avatars/${userRes.data.id}/${userRes.data.avatar}.png` : `https://cdn.discordapp.com/embed/avatars/0.png`
-        };
-        res.redirect('/');
-    } catch (e) {
-        console.error('Ошибка авторизации:', e.message);
-        res.redirect('/');
+    const pathImg=loadTexture('/path.png');
+    for(const r of mapData.roadTiles){
+        if(pathImg.complete)offscreenCtx.drawImage(pathImg,r.x,r.y,32,32);
+        else{offscreenCtx.fillStyle='#c8a96e';offscreenCtx.fillRect(r.x,r.y,32,32);}
     }
-});
-
-app.get('/auth/me', async (req, res) => {
-    if (!req.session.user) return res.json(null);
-    const user = req.session.user;
-    let balance = 0, inventory = [], health = 100, house = null;
-    if (db) {
-        const doc = await db.collection('voice_time').findOne({ _id: user.id });
-        balance = doc ? Math.floor(doc.coins || 0) : 0;
-        inventory = doc ? (doc.inventory || []) : [];
-        health = doc ? (doc.health || 100) : 100;
-        house = doc ? (doc.house || null) : null;
+    const treeImg=loadTexture('/tree.png'),bushImg=loadTexture('/kyst.png');
+    for(const t of mapData.trees){
+        const img=t.type==='tree'?treeImg:bushImg;
+        if(img.complete)offscreenCtx.drawImage(img,t.x-16,t.y-24,32,32);
     }
-    res.json({ ...user, balance, inventory, health, house });
-});
-
-app.get('/auth/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/');
-});
-
-// Карта
-const CITY_CENTER = { x: MAP_W / 2, y: MAP_H / 2 };
-
-const TREE_POSITIONS = [];
-for (let i = 0; i < 100; i++) {
-    const x = Math.random() * (MAP_W - 100) + 50;
-    const y = Math.random() * (MAP_H - 100) + 50;
-    const distFromCity = Math.hypot(x - CITY_CENTER.x, y - CITY_CENTER.y);
-    if (distFromCity > 400) TREE_POSITIONS.push({ x, y, type: Math.random() > 0.3 ? 'tree' : 'bush' });
 }
 
-const ROAD_TILES = [];
-for (let rx = CITY_CENTER.x - 350; rx < CITY_CENTER.x + 350; rx += 32) {
-    for (let ry = CITY_CENTER.y - 280; ry < CITY_CENTER.y + 280; ry += 32) {
-        if (Math.abs(rx - CITY_CENTER.x) < 64 || Math.abs(ry - CITY_CENTER.y) < 64) ROAD_TILES.push({ x: rx, y: ry });
-    }
-}
-
-const BUILDINGS = [
-    { x: CITY_CENTER.x - 300, y: CITY_CENTER.y - 260, w: 250, h: 160, type: 'tavern', label: '🍺 Пьяный Кусик' },
-    { x: CITY_CENTER.x + 80, y: CITY_CENTER.y - 260, w: 200, h: 160, type: 'casino', label: '🎰 Казино' },
-];
-
-const LAMPS = [];
-for (let lx = CITY_CENTER.x - 300; lx < CITY_CENTER.x + 350; lx += 120) {
-    for (let ly = CITY_CENTER.y - 280; ly < CITY_CENTER.y + 280; ly += 100) {
-        if (Math.abs(lx - CITY_CENTER.x) < 64 || Math.abs(ly - CITY_CENTER.y) < 64) LAMPS.push({ x: lx, y: ly });
-    }
-}
-
-const FISHING_ZONES = [
-    { x: 200, y: MAP_H - 400, w: 320, h: 240, label: '🎣 Лесное озеро' },
-    { x: MAP_W - 520, y: MAP_H - 400, w: 320, h: 240, label: '🎣 Тихий пруд' },
-];
-
-const players = {};
-const fishTimers = {};
-const discordSockets = {};
-const houses = {};
-const coffeeTimers = {};
-
-(async () => {
-    if (db) {
-        const docs = await db.collection('voice_time').find({ house: { $exists: true } }).toArray();
-        for (const doc of docs) { if (doc.house) houses[doc._id] = doc.house; }
-    }
-})();
-
-io.on('connection', (socket) => {
-    console.log('Игрок подключился:', socket.id);
-    players[socket.id] = {
-        x: CITY_CENTER.x + Math.random() * 100 - 50,
-        y: CITY_CENTER.y + Math.random() * 100 - 50,
-        name: 'Игрок', avatar: null, balance: 0, discordId: null,
-        inventory: [], health: 100, speed: 4, house: null, dir: 'down', emoji: null
-    };
-
-    socket.emit('mapData', {
-        mapW: MAP_W, mapH: MAP_H,
-        trees: TREE_POSITIONS, roadTiles: ROAD_TILES,
-        buildings: BUILDINGS, lamps: LAMPS,
-        fishingZones: FISHING_ZONES,
-        cityCenter: CITY_CENTER, houses
-    });
-    socket.emit('currentPlayers', players);
-    socket.broadcast.emit('newPlayer', { id: socket.id, ...players[socket.id] });
-
-    socket.on('setProfile', (data) => {
-        if (players[socket.id]) {
-            const oldSocketId = discordSockets[data.discordId];
-            if (oldSocketId && oldSocketId !== socket.id && players[oldSocketId]) {
-                delete players[oldSocketId];
-                io.emit('playerDisconnected', oldSocketId);
-            }
-            discordSockets[data.discordId] = socket.id;
-            players[socket.id].name = data.name;
-            players[socket.id].avatar = data.avatar;
-            players[socket.id].balance = data.balance || 0;
-            players[socket.id].discordId = data.discordId;
-            players[socket.id].inventory = data.inventory || [];
-            players[socket.id].health = data.health || 100;
-            players[socket.id].house = data.house || null;
-            io.emit('playerUpdated', {
-                id: socket.id, name: data.name, avatar: data.avatar,
-                balance: data.balance, inventory: data.inventory, health: data.health, house: data.house
-            });
+// Прогрев сервера перед авторизацией
+fetch('/ping').then(() => {
+    fetch('/auth/me').then(r => r.json()).then(user => {
+        if(user){
+            currentUser = user;
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('user-name').textContent = user.username;
+            document.getElementById('user-avatar').src = user.avatar;
+            document.getElementById('balance-val').textContent = user.balance;
+            document.getElementById('health-val').textContent = user.health || 100;
+            startGame(user);
+        } else {
+            document.getElementById('login-screen').style.display = 'flex';
         }
     });
+});
 
-    socket.on('move', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].x = Math.max(10, Math.min(MAP_W - 10, data.x));
-            players[socket.id].y = Math.max(10, Math.min(MAP_H - 10, data.y));
-            players[socket.id].dir = data.dir;
-            socket.broadcast.emit('playerMoved', { id: socket.id, x: players[socket.id].x, y: players[socket.id].y, dir: data.dir });
-        }
-    });
-
-    socket.on('emoji', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].emoji = data.emoji;
-            players[socket.id].emojiTime = Date.now();
-            io.emit('playerEmoji', { id: socket.id, emoji: data.emoji });
-            setTimeout(() => {
-                if (players[socket.id]) players[socket.id].emoji = null;
-                io.emit('playerEmoji', { id: socket.id, emoji: null });
-            }, 3000);
-        }
-    });
-
-    socket.on('startFishing', () => {
-        const player = players[socket.id];
-        if (!player) return;
-        const inZone = FISHING_ZONES.some(z =>
-            player.x > z.x && player.x < z.x + z.w && player.y > z.y && player.y < z.y + z.h
-        );
-        if (!inZone) { socket.emit('fishingError', { message: 'Нужно быть у водоёма!' }); return; }
-        socket.emit('fishingStarted');
-        const catchTime = 3000 + Math.random() * 7000;
-        fishTimers[socket.id] = setTimeout(() => {
-            socket.emit('fishingReady');
-            const pullTimeout = setTimeout(() => {
-                socket.emit('fishingMissed');
-                delete fishTimers[socket.id];
-            }, 2000);
-            fishTimers[socket.id] = { pullTimeout };
-        }, catchTime);
-    });
-
-    socket.on('pullFish', () => {
-        const timer = fishTimers[socket.id];
-        if (!timer || !timer.pullTimeout) return;
-        clearTimeout(timer.pullTimeout);
-        delete fishTimers[socket.id];
-
-        const player = players[socket.id];
-        if (!player) return;
-
-        const fishTypes = [
-            { name: '🐟 Карась', price: 10, chance: 0.50 },
-            { name: '🐠 Окунь', price: 15, chance: 0.25 },
-            { name: '🐡 Фугу', price: 30, chance: 0.12 },
-            { name: '🦈 Акула', price: 60, chance: 0.08 },
-            { name: '🐳 Кит', price: 150, chance: 0.05 },
-        ];
-        const roll = Math.random();
-        let cum = 0;
-        let fish = fishTypes[0];
-        for (const f of fishTypes) { cum += f.chance; if (roll < cum) { fish = f; break; } }
-
-        if (db && player.discordId) {
-            db.collection('voice_time').updateOne(
-                { _id: player.discordId },
-                { $inc: { coins: fish.price }, $push: { inventory: { name: fish.name, price: fish.price, date: new Date().toISOString() } } },
-                { upsert: true }
-            ).catch(e => console.error('Ошибка начисления:', e));
-        }
-        player.balance += fish.price;
-        if (!player.inventory) player.inventory = [];
-        player.inventory.push({ name: fish.name, price: fish.price });
-        socket.emit('fishCaught', { fish: fish.name, price: fish.price, balance: player.balance, inventory: player.inventory });
-        io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
-    });
-
-    socket.on('cancelFishing', () => {
-        if (fishTimers[socket.id]) {
-            if (fishTimers[socket.id].pullTimeout) clearTimeout(fishTimers[socket.id].pullTimeout);
-            else clearTimeout(fishTimers[socket.id]);
-            delete fishTimers[socket.id];
-        }
-    });
-
-    socket.on('sellFish', (data) => {
-        const player = players[socket.id];
-        if (!player || !player.inventory) return;
-        const idx = player.inventory.findIndex(item => item.name === data.fishName && item.price === data.price);
-        if (idx === -1) return;
-        const sold = player.inventory.splice(idx, 1)[0];
-        player.balance += sold.price;
-        if (db && player.discordId) {
-            db.collection('voice_time').updateOne(
-                { _id: player.discordId },
-                { $inc: { coins: sold.price }, $set: { inventory: player.inventory } }
-            ).catch(e => console.error('Ошибка продажи:', e));
-        }
-        socket.emit('fishSold', { fish: sold.name, price: sold.price, balance: player.balance, inventory: player.inventory });
-        io.emit('playerUpdated', { id: socket.id, balance: player.balance, inventory: player.inventory });
-    });
-
-    socket.on('placeHouse', (data) => {
-        const player = players[socket.id];
-        if (!player || player.balance < 5000 || player.house) return;
-        const hx = data.x, hy = data.y;
-        const distFromCity = Math.hypot(hx - CITY_CENTER.x, hy - CITY_CENTER.y);
-        if (distFromCity < 450) { socket.emit('houseError', { message: 'Слишком близко к городу!' }); return; }
-        for (const z of FISHING_ZONES) {
-            if (hx > z.x && hx < z.x + z.w && hy > z.y && hy < z.y + z.h) {
-                socket.emit('houseError', { message: 'Нельзя строить на воде!' }); return;
-            }
-        }
-        for (const h of Object.values(houses)) {
-            if (Math.abs(hx - h.x) < 80 && Math.abs(hy - h.y) < 80) {
-                socket.emit('houseError', { message: 'Слишком близко к другому домику!' }); return;
-            }
-        }
-        player.balance -= 5000;
-        player.house = { x: hx, y: hy, owner: player.name };
-        houses[player.discordId] = player.house;
-        if (db && player.discordId) {
-            db.collection('voice_time').updateOne(
-                { _id: player.discordId },
-                { $set: { coins: player.balance, house: player.house } }
-            ).catch(e => console.error('Ошибка домика:', e));
-        }
-        io.emit('housePlaced', { ownerId: player.discordId, house: player.house, balance: player.balance });
-        io.emit('playerUpdated', { id: socket.id, balance: player.balance, house: player.house });
-    });
-
-    socket.on('drinkCoffee', () => {
-        const player = players[socket.id];
-        if (!player) return;
-        const now = Date.now();
-        const lastCoffee = coffeeTimers[player.discordId] || 0;
-        if (now - lastCoffee < 300000) {
-            const remaining = Math.ceil((300000 - (now - lastCoffee)) / 60000);
-            socket.emit('coffeeError', { message: `Кофе будет готов через ${remaining} мин.` });
+function startGame(user){
+    socket=io();
+    document.addEventListener('keydown',e=>{
+        if(tavernOpen)return;
+        if(document.activeElement===document.getElementById('chat-input')){
+            if(e.code==='Enter'){const i=document.getElementById('chat-input');if(i.value.trim()){socket.emit('chatMessage',{text:i.value.trim()});i.value='';}i.blur();}
             return;
         }
-        coffeeTimers[player.discordId] = now;
-        player.speed = 6;
-        socket.emit('coffeeActive', { speed: 6 });
-        setTimeout(() => {
-            if (players[socket.id]) { players[socket.id].speed = 4; socket.emit('coffeeExpired', { speed: 4 }); }
-        }, 60000);
-    });
-
-    socket.on('chatMessage', (data) => {
-        if (players[socket.id]) {
-            io.emit('chatMessage', { id: socket.id, name: players[socket.id].name, text: data.text.substring(0, 100) });
+        keys[e.code]=true;
+        if(e.code==='KeyF'&&!fishingActive)startFishing();
+        if(e.code==='KeyE'&&!fishingActive){
+            const me=players[myId];
+            if(me&&mapData)for(const b of mapData.buildings)if(me.x>b.x&&me.x<b.x+b.w&&me.y>b.y&&me.y<b.y+b.h){if(b.type==='shop')openTavern();break;}
+            if(!tavernOpen)socket.emit('emoji',{emoji:['😊','😂','🎉','💀','🔥','💜','🐟','☕','🎣','💰'][Math.floor(Math.random()*10)]});
         }
+        if(e.code==='Enter')document.getElementById('chat-input').focus();
+        if(e.code==='KeyC')socket.emit('drinkCoffee');
+        if(e.code==='Escape')closeFishing();
     });
-
-    socket.on('tavernAction', (data) => {
-        const player = players[socket.id];
-        if (!player) return;
-        switch (data.action) {
-            case 'beer':
-                if (player.balance < 10) { socket.emit('tavernResult', { success: false, message: 'Не хватает кусиков!' }); return; }
-                player.balance -= 10;
-                player.health = Math.min(100, player.health + 20);
-                socket.emit('tavernResult', { success: true, message: 'Васыль наливает тебе эль. -10 кс, +20 здоровья.', balance: player.balance, health: player.health });
-                io.emit('playerUpdated', { id: socket.id, balance: player.balance, health: player.health });
-                break;
-            case 'room':
-                if (player.balance < 50) { socket.emit('tavernResult', { success: false, message: 'Не хватает кусиков!' }); return; }
-                player.balance -= 50;
-                player.health = 100;
-                socket.emit('tavernResult', { success: true, message: 'Васыль даёт ключ. -50 кс, здоровье 100.', balance: player.balance, health: player.health });
-                io.emit('playerUpdated', { id: socket.id, balance: player.balance, health: player.health });
-                break;
-        }
+    document.addEventListener('keyup',e=>{keys[e.code]=false;});
+    document.getElementById('chat-input').addEventListener('keydown',e=>{
+        if(e.code==='Enter'){const i=document.getElementById('chat-input');if(i.value.trim()){socket.emit('chatMessage',{text:i.value.trim()});i.value='';}i.blur();}
+        e.stopPropagation();
     });
+    socket.on('mapData',data=>{mapData=data;camera.x=data.cityCenter.x-canvas.width/2;camera.y=data.cityCenter.y-canvas.height/2;setTimeout(buildOffscreenMap,800);});
+    socket.on('currentPlayers',sp=>{myId=socket.id;for(const id in players)delete players[id];Object.assign(players,sp);socket.emit('setProfile',{name:user.username,avatar:user.avatar,balance:user.balance,discordId:user.id,inventory:user.inventory||[],health:user.health||100,house:user.house});});
+    socket.on('newPlayer',data=>{players[data.id]={...data,dir:'down',emoji:null};});
+    socket.on('playerUpdated',data=>{if(players[data.id]){if(data.name)players[data.id].name=data.name;if(data.avatar)players[data.id].avatar=data.avatar;if(data.balance!==undefined)players[data.id].balance=data.balance;if(data.inventory)players[data.id].inventory=data.inventory;if(data.health!==undefined)players[data.id].health=data.health;}});
+    socket.on('playerMoved',data=>{if(players[data.id]){players[data.id].tx=data.x;players[data.id].ty=data.y;}});
+    socket.on('playerDisconnected',id=>{delete players[id];});
+    socket.on('playerEmoji',data=>{if(players[data.id]){players[data.id].emoji=data.emoji;players[data.id].emojiTime=Date.now();}});
+    socket.on('chatMessage',data=>{chatMessages.push({name:data.name,text:data.text,time:Date.now()});if(chatMessages.length>20)chatMessages.shift();});
+    socket.on('fishingStarted',()=>{fishingActive=true;document.getElementById('fishing-ui').style.display='block';document.getElementById('fishing-text').textContent='🎣 Закидываем удочку...';document.getElementById('fishing-timer').textContent='⏳ Ждём...';document.getElementById('fishing-pull-btn').style.display='none';fishingReady=false;canPull=false;});
+    socket.on('fishingReady',()=>{document.getElementById('fishing-text').textContent='🎣 Клюёт!';document.getElementById('fishing-timer').textContent='⚡ ТЯНИ!';document.getElementById('fishing-pull-btn').style.display='inline-block';fishingReady=true;canPull=true;});
+    socket.on('fishingMissed',()=>{alert('😢 Упустил!');closeFishing();});
+    socket.on('fishCaught',data=>{document.getElementById('balance-val').textContent=data.balance;alert(`🎣 Поймал: ${data.fish}! +${data.price} кс`);closeFishing();});
+    socket.on('fishSold',data=>{document.getElementById('balance-val').textContent=data.balance;closeTavern();});
+    socket.on('housePlaced',data=>{if(mapData)mapData.houses[data.ownerId]=data.house;document.getElementById('balance-val').textContent=data.balance;buildOffscreenMap();});
+    socket.on('houseError',data=>{alert(data.message);});
+    socket.on('coffeeActive',()=>{mySpeed=6;alert('☕ Кофе! +50% скорости на минуту!');});
+    socket.on('coffeeExpired',()=>{mySpeed=4;});
+    socket.on('coffeeError',data=>{alert(data.message);});
+    socket.on('tavernResult',data=>{if(data.success){document.getElementById('tavern-dialog').textContent=data.message;document.getElementById('balance-val').textContent=data.balance;document.getElementById('health-val').textContent=data.health;document.getElementById('tavern-balance').textContent=data.balance;document.getElementById('tavern-health').textContent=data.health;}else{document.getElementById('tavern-dialog').textContent=data.message;}});
+    gameLoop();
+}
 
-    socket.on('disconnect', () => {
-        if (fishTimers[socket.id]) {
-            if (fishTimers[socket.id].pullTimeout) clearTimeout(fishTimers[socket.id].pullTimeout);
-            else clearTimeout(fishTimers[socket.id]);
-            delete fishTimers[socket.id];
-        }
-        const player = players[socket.id];
-        if (player && player.discordId && discordSockets[player.discordId] === socket.id) delete discordSockets[player.discordId];
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
-    });
-});
+function startFishing(){if(fishingActive||tavernOpen)return;const me=players[myId];if(!me||!mapData)return;const inZone=mapData.fishingZones.some(z=>me.x>z.x&&me.x<z.x+z.w&&me.y>z.y&&me.y<z.y+z.h);if(!inZone){alert('Нужно быть у водоёма!');return;}socket.emit('startFishing');}
+function pullFish(){if(canPull){canPull=false;socket.emit('pullFish');}}
+function closeFishing(){fishingActive=false;fishingReady=false;canPull=false;document.getElementById('fishing-ui').style.display='none';document.getElementById('fishing-pull-btn').style.display='none';socket.emit('cancelFishing');}
+function openTavern(){tavernOpen=true;const p=players[myId];document.getElementById('tavern-ui').style.display='block';document.getElementById('tavern-balance').textContent=p?.balance||0;document.getElementById('tavern-health').textContent=p?.health||100;document.getElementById('tavern-dialog').textContent='Добро пожаловать, путник! Что угодно?';document.getElementById('tavern-sell-panel').style.display='none';}
+function closeTavern(){tavernOpen=false;document.getElementById('tavern-ui').style.display='none';document.getElementById('dice-game').style.display='none';}
+function tavernAction(action){const p=players[myId];if(!p)return;switch(action){case'beer':socket.emit('tavernAction',{action:'beer'});break;case'dice':document.getElementById('dice-game').style.display='block';break;case'room':socket.emit('tavernAction',{action:'room'});break;case'sell':const inv=p.inventory||[];const panel=document.getElementById('tavern-sell-panel');if(inv.length===0)panel.innerHTML='<p style="color:#aaa;">Инвентарь пуст.</p>';else{let h='';inv.forEach((item,i)=>{h+=`<div class="sell-item"><span>${item.name}</span><span>${item.price} кс</span><button class="sell-btn" onclick="sellFish(${i})">Продать</button></div>`;});panel.innerHTML=h;panel.style.display='block';}break;}}
+function sellFish(idx){const inv=players[myId]?.inventory;if(!inv||idx>=inv.length)return;socket.emit('sellFish',{fishName:inv[idx].name,price:inv[idx].price});}
+function rollDice(){const bet=parseInt(document.getElementById('dice-bet').value)||10;const p=players[myId];if(!p||p.balance<bet){document.getElementById('dice-outcome').textContent='Недостаточно кс!';return;}let c=0;const iv=setInterval(()=>{document.getElementById('dice-result').textContent=['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)]+' '+['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)];if(++c>8){clearInterval(iv);const ps=Math.floor(Math.random()*6)+1+Math.floor(Math.random()*6)+1,cs=Math.floor(Math.random()*6)+1+Math.floor(Math.random()*6)+1;document.getElementById('dice-result').textContent=`Ты: ${ps}  CPU: ${cs}`;if(ps>cs){p.balance+=bet;document.getElementById('dice-outcome').textContent=`Победа! +${bet} кс`;}else{p.balance-=bet;document.getElementById('dice-outcome').textContent=`Поражение! -${bet} кс`;}document.getElementById('balance-val').textContent=p.balance;document.getElementById('tavern-balance').textContent=p.balance;socket.emit('setProfile',{...currentUser,balance:p.balance,health:p.health,discordId:p.discordId,inventory:p.inventory,house:p.house});}},80);}
+function closeDice(){document.getElementById('dice-game').style.display='none';}
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Сервер запущен: http://localhost:${PORT}`);
-});
+function update(){
+    if(!myId||!players[myId]||tavernOpen)return;
+    const me=players[myId];let dx=0,dy=0,moved=false;
+    if(keys['KeyW']||keys['ArrowUp']){dy=-mySpeed;moved=true;me.dir='up';}
+    if(keys['KeyS']||keys['ArrowDown']){dy=mySpeed;moved=true;me.dir='down';}
+    if(keys['KeyA']||keys['ArrowLeft']){dx=-mySpeed;moved=true;me.dir='left';}
+    if(keys['KeyD']||keys['ArrowRight']){dx=mySpeed;moved=true;me.dir='right';}
+    if(moved){me.x=Math.max(10,Math.min((mapData?.mapW||2400)-10,me.x+dx));me.y=Math.max(10,Math.min((mapData?.mapH||1800)-10,me.y+dy));socket.emit('move',{x:me.x,y:me.y,dir:me.dir});}
+    for(const id in players){if(id===myId)continue;const p=players[id];if(p.tx){p.x+=(p.tx-p.x)*0.25;if(Math.abs(p.tx-p.x)<0.5)p.x=p.tx;}if(p.ty){p.y+=(p.ty-p.y)*0.25;if(Math.abs(p.ty-p.y)<0.5)p.y=p.ty;}}
+    camera.x+=(me.x-canvas.width/2-camera.x)*0.1;camera.y+=(me.y-canvas.height/2-camera.y)*0.1;
+    if(mapData){const tt=document.getElementById('zone-tooltip');let t='';for(const z of mapData.fishingZones)if(me.x>z.x&&me.x<z.x+z.w&&me.y>z.y&&me.y<z.y+z.h)t=z.label+' — F рыбачить';if(!t)for(const b of mapData.buildings)if(me.x>b.x&&me.x<b.x+b.w&&me.y>b.y&&me.y<b.y+b.h)t=b.label+' — E войти';tt.textContent=t;tt.style.display=t?'block':'none';}
+}
+
+function draw(){
+    if(!mapData){ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,canvas.width,canvas.height);return;}
+    if(offscreenCanvas)ctx.drawImage(offscreenCanvas,camera.x,camera.y,canvas.width,canvas.height,0,0,canvas.width,canvas.height);
+    const waterImg=loadTexture('/water.png');
+    for(const z of mapData.fishingZones){for(let wy=z.y;wy<z.y+z.h;wy+=32)for(let wx=z.x;wx<z.x+z.w;wx+=32){const sx=wx-camera.x,sy=wy-camera.y;if(waterImg.complete)ctx.drawImage(waterImg,sx,sy,32,32);else{ctx.fillStyle='#2980b9';ctx.fillRect(sx,sy,32,32);}}ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText(z.label,z.x+z.w/2-camera.x,z.y-8-camera.y);}
+    for(const b of mapData.buildings){
+        const sx=b.x-camera.x,sy=b.y-camera.y;
+        const img=loadTexture('/'+b.type+'.png');
+        if(img.complete&&img.naturalWidth>0)ctx.drawImage(img,sx-10,sy-20,b.w+20,b.h+40);
+        else{ctx.fillStyle='#5a3a1a';ctx.fillRect(sx,sy,b.w,b.h);ctx.fillStyle='#8B0000';ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+b.w/2,sy-30);ctx.lineTo(sx+b.w,sy);ctx.fill();}
+        ctx.font='bold 14px Arial';
+        ctx.textAlign='center';
+        ctx.fillStyle='white';
+        ctx.fillText(b.label, sx + b.w/2, sy - 20);
+    }
+    if(mapData.houses){const hi=loadTexture('/stone.png');for(const[oid,h]of Object.entries(mapData.houses)){const sx=h.x-camera.x,sy=h.y-camera.y;if(hi.complete)ctx.drawImage(hi,sx-30,sy-30,60,60);else{ctx.fillStyle='#8B4513';ctx.fillRect(sx-30,sy-30,60,60);}ctx.fillStyle='white';ctx.font='9px Arial';ctx.textAlign='center';ctx.fillText(h.owner||'Домик',sx,sy-35);}}
+    for(const id in players){const p=players[id];const sx=p.x-camera.x,sy=p.y-camera.y;ctx.fillStyle=id===myId?'#9b59b6':'#e74c3c';ctx.fillRect(sx-12,sy-20,24,28);ctx.fillStyle=id===myId?'#7d3c98':'#c0392b';ctx.fillRect(sx-10,sy+8,8,10);ctx.fillRect(sx+2,sy+8,8,10);if(p.avatar){const av=loadAvatar(p.avatar);if(av.complete){ctx.save();ctx.beginPath();ctx.arc(sx,sy-28,14,0,Math.PI*2);ctx.clip();ctx.drawImage(av,sx-14,sy-42,28,28);ctx.restore();ctx.beginPath();ctx.arc(sx,sy-28,14,0,Math.PI*2);ctx.strokeStyle=id===myId?'#9b59b6':'#e74c3c';ctx.lineWidth=2;ctx.stroke();}}ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.strokeStyle='black';ctx.lineWidth=2;ctx.strokeText(p.name||'Игрок',sx,sy-46);ctx.fillStyle='white';ctx.fillText(p.name||'Игрок',sx,sy-46);if(p.balance>0){ctx.font='10px Arial';ctx.strokeStyle='black';ctx.lineWidth=2;ctx.strokeText('💰'+p.balance,sx,sy-56);ctx.fillStyle='#f1c40f';ctx.fillText('💰'+p.balance,sx,sy-56);}if(p.emoji&&Date.now()-(p.emojiTime||0)<3000){ctx.font='20px Arial';ctx.textAlign='center';ctx.fillText(p.emoji,sx,sy-66);}}
+    const hour=new Date().getUTCHours()+3;const nightAlpha=hour<6||hour>22?0.35:hour<8||hour>20?0.12:0;
+    if(nightAlpha>0){ctx.fillStyle=`rgba(10,10,40,${nightAlpha})`;ctx.fillRect(0,0,canvas.width,canvas.height);}
+    if(nightAlpha>0.08&&mapData.lamps)for(const l of mapData.lamps){const sx=l.x-camera.x,sy=l.y-camera.y;if(sx>-100&&sx<canvas.width+100&&sy>-100&&sy<canvas.height+100){const g=ctx.createRadialGradient(sx,sy,0,sx,sy,60);g.addColorStop(0,'rgba(255,200,100,0.2)');g.addColorStop(1,'rgba(255,200,100,0)');ctx.fillStyle=g;ctx.fillRect(sx-60,sy-60,120,120);}}
+    const now=Date.now();chatMessages=chatMessages.filter(m=>now-m.time<8000);
+    document.getElementById('chat-messages').innerHTML=chatMessages.map(m=>`<div class="chat-msg"><span class="chat-name">${m.name}:</span> ${m.text}</div>`).join('');
+    document.getElementById('chat-messages').scrollTop=document.getElementById('chat-messages').scrollHeight;
+}
+function gameLoop(){update();draw();requestAnimationFrame(gameLoop);}
+</script>
+</body>
+</html>
