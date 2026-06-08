@@ -34,76 +34,38 @@
         #fishing-pull-btn { display: none; background: #2ecc71; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 18px; cursor: pointer; margin: 8px; }
         #fishing-close-btn { background: #e74c3c; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
         #tavern-ui {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 25;
-            width: 1280px;
-            height: 800px;
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 25; width: 1280px; height: 800px;
             background: url('/tavern.png') center/cover no-repeat;
-            border: 3px solid #8B5E1A;
-            border-radius: 12px;
-            overflow: hidden;
+            border: 3px solid #8B5E1A; border-radius: 12px; overflow: hidden;
+        }
+        #tavern-dialog {
+            position: absolute; top: 24px; left: 665px; width: 560px; height: 280px;
+            padding: 38px 45px; font-family: serif; font-size: 15px; color: #2a1500;
+            text-align: center; overflow: hidden; line-height: 1.5;
         }
         .tavern-btn {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            font-family: serif;
-            font-size: 14px;
-            color: #2a1500;
-            font-weight: bold;
-            text-align: left;
-            padding-left: 18px;
-            position: absolute;
-            width: 250px;
-            height: 40px;
+            position: absolute; left: 985px; width: 250px; height: 40px;
+            background: transparent; border: none; cursor: pointer;
+            font-family: serif; font-size: 14px; color: #2a1500;
+            font-weight: bold; text-align: left; padding-left: 18px;
         }
-        .tavern-btn:hover {
-            color: #8B1A00;
-        }
+        .tavern-btn:hover { color: #8B1A00; }
         #tavern-stats {
-            position: absolute;
-            top: 748px;
-            left: 740px;
-            width: 530px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            font-family: serif;
-            font-size: 14px;
-            color: #2a1500;
+            position: absolute; top: 748px; left: 740px; width: 530px; height: 44px;
+            display: flex; align-items: center; gap: 20px;
+            font-family: serif; font-size: 14px; color: #2a1500;
         }
         #tavern-close {
-            position: absolute;
-            top: 758px;
-            left: 580px;
-            width: 130px;
-            height: 32px;
-            font-family: serif;
-            font-size: 14px;
-            color: #8B1A00;
-            background: transparent;
-            border: none;
-            cursor: pointer;
+            position: absolute; top: 758px; left: 580px; width: 130px; height: 32px;
+            font-family: serif; font-size: 14px; color: #8B1A00;
+            background: transparent; border: none; cursor: pointer;
         }
         #tavern-sell-panel {
-            display: none;
-            position: absolute;
-            top: 50px;
-            left: 50px;
-            width: 500px;
-            max-height: 400px;
-            background: rgba(0,0,0,0.9);
-            border: 2px solid #8B5E1A;
-            border-radius: 8px;
-            padding: 20px;
-            color: #e8d5b0;
-            font-family: serif;
-            overflow-y: auto;
+            display: none; position: absolute; top: 50px; left: 50px;
+            width: 500px; max-height: 400px;
+            background: rgba(0,0,0,0.9); border: 2px solid #8B5E1A; border-radius: 8px;
+            padding: 20px; color: #e8d5b0; font-family: serif; overflow-y: auto;
         }
         .sell-item { display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #3d1f00; font-size: 13px; }
         .sell-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-family: serif; font-size: 12px; }
@@ -112,6 +74,9 @@
         #dice-result { font-size: 40px; margin: 12px 0; }
         #dice-bet { width: 90px; padding: 4px; text-align: center; font-size: 15px; }
         .dice-btn { background: #5a3a1a; color: #e8d5b0; border: 1px solid #8B5E1A; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: serif; font-size: 15px; margin: 4px; }
+    </style>
+</head>
+<body>
 <div id="login-screen"><h1>KYSb Game</h1><p>Войди через Discord чтобы играть</p><button id="login-btn" onclick="location.href='/auth/login'">🎮 Войти через Discord</button></div>
 <div id="game-screen">
     <div id="hud">
@@ -125,25 +90,17 @@
     <div id="chat-panel"><div id="chat-messages"></div><input id="chat-input" type="text" placeholder="Чат (Enter)"></div>
     <div id="fishing-ui"><div id="fishing-text">🎣 Закидываем удочку...</div><div id="fishing-timer">⏳ ...</div><button id="fishing-pull-btn" onclick="pullFish()">🎣 Тянуть!</button><button id="fishing-close-btn" onclick="closeFishing()">✖ Закрыть</button></div>
     <div id="tavern-ui">
-        <div id="tavern-dialog" style="position:absolute;top:24px;left:665px;width:560px;height:280px;padding:38px 45px;font-family:serif;font-size:15px;color:#2a1500;text-align:center;overflow:hidden;line-height:1.5;">
-            Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?
-        </div>
-        
-        <button class="tavern-btn" onclick="tavernAction('beer')" style="top:372px;left:985px;">Выпить эль (10 кс)</button>
-        <button class="tavern-btn" onclick="tavernAction('dice')" style="top:419px;left:985px;">Сыграть в кости</button>
-        <button class="tavern-btn" onclick="tavernAction('room')" style="top:466px;left:985px;">Снять комнату (50 кс)</button>
-        <button class="tavern-btn" onclick="tavernAction('sell')" style="top:513px;left:985px;">Продать рыбу</button>
-        
-        <div id="tavern-stats" style="position:absolute;top:748px;left:740px;width:530px;height:44px;display:flex;align-items:center;gap:20px;font-family:serif;font-size:14px;color:#2a1500;">
-            💰 <span id="tavern-balance">0</span> кс &nbsp; ❤️ <span id="tavern-health">100</span>/100
-        </div>
-        
-        <button id="tavern-close" onclick="closeTavern()" style="position:absolute;top:758px;left:580px;width:130px;height:32px;font-family:serif;font-size:14px;color:#8B1A00;background:transparent;border:none;cursor:pointer;">Уйти из таверны</button>
-        
-        <div id="tavern-sell-panel" style="display:none;position:absolute;top:50px;left:50px;width:500px;max-height:400px;background:rgba(0,0,0,0.9);border:2px solid #8B5E1A;border-radius:8px;padding:20px;color:#e8d5b0;font-family:serif;overflow-y:auto;"></div>
+        <div id="tavern-dialog">Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?</div>
+        <button class="tavern-btn" onclick="tavernAction('beer')" style="top:372px;">Выпить эль (10 кс)</button>
+        <button class="tavern-btn" onclick="tavernAction('dice')" style="top:419px;">Сыграть в кости</button>
+        <button class="tavern-btn" onclick="tavernAction('room')" style="top:466px;">Снять комнату (50 кс)</button>
+        <button class="tavern-btn" onclick="tavernAction('sell')" style="top:513px;">Продать рыбу</button>
+        <div id="tavern-stats">💰 <span id="tavern-balance">0</span> кс &nbsp; ❤️ <span id="tavern-health">100</span>/100</div>
+        <button id="tavern-close" onclick="closeTavern()">Уйти из таверны</button>
+        <div id="tavern-sell-panel"></div>
     </div>
-    
     <div id="dice-game"><div id="dice-inner"><h3>🎲 Кости</h3><div id="dice-result">🎲 🎲</div><div>Ставка: <input type="number" id="dice-bet" min="10" value="10" step="10"> кс</div><br><button class="dice-btn" onclick="rollDice()">Бросить</button><button class="dice-btn" onclick="closeDice()" style="background:#8B1A00;">Закрыть</button><div id="dice-outcome" style="margin-top:8px;font-weight:bold;"></div></div></div>
+</div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
@@ -240,9 +197,9 @@ function startGame(user){
 function startFishing(){if(fishingActive||tavernOpen)return;const me=players[myId];if(!me||!mapData)return;const inZone=mapData.fishingZones.some(z=>me.x>z.x&&me.x<z.x+z.w&&me.y>z.y&&me.y<z.y+z.h);if(!inZone){alert('Нужно быть у водоёма!');return;}socket.emit('startFishing');}
 function pullFish(){if(canPull){canPull=false;socket.emit('pullFish');}}
 function closeFishing(){fishingActive=false;fishingReady=false;canPull=false;document.getElementById('fishing-ui').style.display='none';document.getElementById('fishing-pull-btn').style.display='none';socket.emit('cancelFishing');}
-function openTavern(){tavernOpen=true;const p=players[myId];document.getElementById('tavern-ui').style.display='block';document.getElementById('tavern-balance').textContent=p?.balance||0;document.getElementById('tavern-health').textContent=p?.health||100;document.getElementById('tavern-dialog').textContent='Добро пожаловать, путник! Что угодно?';document.getElementById('tavern-sell-panel').innerHTML='';}
+function openTavern(){tavernOpen=true;const p=players[myId];document.getElementById('tavern-ui').style.display='block';document.getElementById('tavern-balance').textContent=p?.balance||0;document.getElementById('tavern-health').textContent=p?.health||100;document.getElementById('tavern-dialog').textContent='Добро пожаловать, путник! Что угодно?';document.getElementById('tavern-sell-panel').style.display='none';}
 function closeTavern(){tavernOpen=false;document.getElementById('tavern-ui').style.display='none';document.getElementById('dice-game').style.display='none';}
-function tavernAction(action){const p=players[myId];if(!p)return;switch(action){case'beer':socket.emit('tavernAction',{action:'beer'});break;case'dice':document.getElementById('dice-game').style.display='block';break;case'room':socket.emit('tavernAction',{action:'room'});break;case'sell':const inv=p.inventory||[];const panel=document.getElementById('tavern-sell-panel');if(inv.length===0)panel.innerHTML='<p style="color:#aaa;">Инвентарь пуст.</p>';else{let h='';inv.forEach((item,i)=>{h+=`<div class="sell-item"><span>${item.name}</span><span>${item.price} кс</span><button class="sell-btn" onclick="sellFish(${i})">Продать</button></div>`;});panel.innerHTML=h;}break;}}
+function tavernAction(action){const p=players[myId];if(!p)return;switch(action){case'beer':socket.emit('tavernAction',{action:'beer'});break;case'dice':document.getElementById('dice-game').style.display='block';break;case'room':socket.emit('tavernAction',{action:'room'});break;case'sell':const inv=p.inventory||[];const panel=document.getElementById('tavern-sell-panel');if(inv.length===0)panel.innerHTML='<p style="color:#aaa;">Инвентарь пуст.</p>';else{let h='';inv.forEach((item,i)=>{h+=`<div class="sell-item"><span>${item.name}</span><span>${item.price} кс</span><button class="sell-btn" onclick="sellFish(${i})">Продать</button></div>`;});panel.innerHTML=h;panel.style.display='block';}break;}}
 function sellFish(idx){const inv=players[myId]?.inventory;if(!inv||idx>=inv.length)return;socket.emit('sellFish',{fishName:inv[idx].name,price:inv[idx].price});}
 function rollDice(){const bet=parseInt(document.getElementById('dice-bet').value)||10;const p=players[myId];if(!p||p.balance<bet){document.getElementById('dice-outcome').textContent='Недостаточно кс!';return;}let c=0;const iv=setInterval(()=>{document.getElementById('dice-result').textContent=['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)]+' '+['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)];if(++c>8){clearInterval(iv);const ps=Math.floor(Math.random()*6)+1+Math.floor(Math.random()*6)+1,cs=Math.floor(Math.random()*6)+1+Math.floor(Math.random()*6)+1;document.getElementById('dice-result').textContent=`Ты: ${ps}  CPU: ${cs}`;if(ps>cs){p.balance+=bet;document.getElementById('dice-outcome').textContent=`Победа! +${bet} кс`;}else{p.balance-=bet;document.getElementById('dice-outcome').textContent=`Поражение! -${bet} кс`;}document.getElementById('balance-val').textContent=p.balance;document.getElementById('tavern-balance').textContent=p.balance;socket.emit('setProfile',{...currentUser,balance:p.balance,health:p.health,discordId:p.discordId,inventory:p.inventory,house:p.house});}},80);}
 function closeDice(){document.getElementById('dice-game').style.display='none';}
@@ -265,15 +222,12 @@ function draw(){
     if(offscreenCanvas)ctx.drawImage(offscreenCanvas,camera.x,camera.y,canvas.width,canvas.height,0,0,canvas.width,canvas.height);
     const waterImg=loadTexture('/water.png');
     for(const z of mapData.fishingZones){for(let wy=z.y;wy<z.y+z.h;wy+=32)for(let wx=z.x;wx<z.x+z.w;wx+=32){const sx=wx-camera.x,sy=wy-camera.y;if(waterImg.complete)ctx.drawImage(waterImg,sx,sy,32,32);else{ctx.fillStyle='#2980b9';ctx.fillRect(sx,sy,32,32);}}ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText(z.label,z.x+z.w/2-camera.x,z.y-8-camera.y);}
-    for (const b of mapData.buildings) {
-        const sx = b.x - camera.x, sy = b.y - camera.y;
-        if (b.type === 'casino') {
-            const img = loadTexture('/casino.png');
-            ctx.drawImage(img, sx - 10, sy - 20, b.w + 20, b.h + 40);
-        } else if (b.type === 'tavern') {
-            const img = loadTexture('/shop.png');
-            ctx.drawImage(img, sx - 10, sy - 20, b.w + 20, b.h + 40);
-        }
+    for(const b of mapData.buildings){
+        const sx=b.x-camera.x,sy=b.y-camera.y;
+        const img=loadTexture('/'+b.type+'.png');
+        if(img.complete&&img.naturalWidth>0)ctx.drawImage(img,sx-10,sy-20,b.w+20,b.h+40);
+        else{ctx.fillStyle='#5a3a1a';ctx.fillRect(sx,sy,b.w,b.h);ctx.fillStyle='#8B0000';ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+b.w/2,sy-30);ctx.lineTo(sx+b.w,sy);ctx.fill();}
+        ctx.font='bold 14px Arial';ctx.textAlign='center';ctx.fillStyle='white';ctx.fillText(b.label,sx+b.w/2,sy+b.h/2);
     }
     if(mapData.houses){const hi=loadTexture('/stone.png');for(const[oid,h]of Object.entries(mapData.houses)){const sx=h.x-camera.x,sy=h.y-camera.y;if(hi.complete)ctx.drawImage(hi,sx-30,sy-30,60,60);else{ctx.fillStyle='#8B4513';ctx.fillRect(sx-30,sy-30,60,60);}ctx.fillStyle='white';ctx.font='9px Arial';ctx.textAlign='center';ctx.fillText(h.owner||'Домик',sx,sy-35);}}
     for(const id in players){const p=players[id];const sx=p.x-camera.x,sy=p.y-camera.y;ctx.fillStyle=id===myId?'#9b59b6':'#e74c3c';ctx.fillRect(sx-12,sy-20,24,28);ctx.fillStyle=id===myId?'#7d3c98':'#c0392b';ctx.fillRect(sx-10,sy+8,8,10);ctx.fillRect(sx+2,sy+8,8,10);if(p.avatar){const av=loadAvatar(p.avatar);if(av.complete){ctx.save();ctx.beginPath();ctx.arc(sx,sy-28,14,0,Math.PI*2);ctx.clip();ctx.drawImage(av,sx-14,sy-42,28,28);ctx.restore();ctx.beginPath();ctx.arc(sx,sy-28,14,0,Math.PI*2);ctx.strokeStyle=id===myId?'#9b59b6':'#e74c3c';ctx.lineWidth=2;ctx.stroke();}}ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.strokeStyle='black';ctx.lineWidth=2;ctx.strokeText(p.name||'Игрок',sx,sy-46);ctx.fillStyle='white';ctx.fillText(p.name||'Игрок',sx,sy-46);if(p.balance>0){ctx.font='10px Arial';ctx.strokeStyle='black';ctx.lineWidth=2;ctx.strokeText('💰'+p.balance,sx,sy-56);ctx.fillStyle='#f1c40f';ctx.fillText('💰'+p.balance,sx,sy-56);}if(p.emoji&&Date.now()-(p.emojiTime||0)<3000){ctx.font='20px Arial';ctx.textAlign='center';ctx.fillText(p.emoji,sx,sy-66);}}
