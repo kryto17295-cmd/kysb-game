@@ -46,11 +46,22 @@
         }
         .tavern-btn {
             position: absolute; left: 940px; width: 250px; height: 40px;
-            background: transparent; border: none; cursor: pointer;
-            font-family: serif; font-size: 14px; color: #2a1500;
-            font-weight: bold; text-align: left; padding-left: 18px;
+            background: #8B5E1A;
+            border: 2px solid #5a3a1a;
+            border-radius: 8px;
+            color: #f5e6c8;
+            font-family: serif;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: left;
+            padding-left: 18px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 #3d1f00;
         }
-        .tavern-btn:hover { color: #8B1A00; }
+        .tavern-btn:hover {
+            background: #a0702a;
+            color: white;
+        }
         #tavern-stats {
             position: absolute; top: 748px; left: 680px; width: 530px; height: 44px;
             display: flex; align-items: center; gap: 20px;
@@ -59,7 +70,9 @@
         #tavern-close {
             position: absolute; top: 758px; left: 580px; width: 130px; height: 32px;
             font-family: serif; font-size: 14px; color: #8B1A00;
-            background: transparent; border: none; cursor: pointer;
+            background: transparent;
+            border: none;
+            cursor: pointer;
         }
         #tavern-sell-panel {
             display: none; position: absolute; top: 50px; left: 50px;
@@ -135,7 +148,6 @@ function buildOffscreenMap(){
     }
 }
 
-// Прогрев сервера перед авторизацией
 fetch('/ping').then(() => {
     fetch('/auth/me').then(r => r.json()).then(user => {
         if(user){
@@ -177,7 +189,13 @@ function startGame(user){
         if(e.code==='Enter'){const i=document.getElementById('chat-input');if(i.value.trim()){socket.emit('chatMessage',{text:i.value.trim()});i.value='';}i.blur();}
         e.stopPropagation();
     });
-    socket.on('mapData',data=>{mapData=data;camera.x=data.cityCenter.x-canvas.width/2;camera.y=data.cityCenter.y-canvas.height/2;setTimeout(buildOffscreenMap,800);});
+    socket.on('mapData',data=>{
+        mapData=data;
+        camera.x=data.cityCenter.x-canvas.width/2;
+        camera.y=data.cityCenter.y-canvas.height/2;
+        buildOffscreenMap();
+        setTimeout(buildOffscreenMap,800);
+    });
     socket.on('currentPlayers',sp=>{myId=socket.id;for(const id in players)delete players[id];Object.assign(players,sp);socket.emit('setProfile',{name:user.username,avatar:user.avatar,balance:user.balance,discordId:user.id,inventory:user.inventory||[],health:user.health||100,house:user.house});});
     socket.on('newPlayer',data=>{players[data.id]={...data,dir:'down',emoji:null};});
     socket.on('playerUpdated',data=>{if(players[data.id]){if(data.name)players[data.id].name=data.name;if(data.avatar)players[data.id].avatar=data.avatar;if(data.balance!==undefined)players[data.id].balance=data.balance;if(data.inventory)players[data.id].inventory=data.inventory;if(data.health!==undefined)players[data.id].health=data.health;}});
