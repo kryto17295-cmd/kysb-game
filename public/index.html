@@ -104,12 +104,12 @@
     <div id="fishing-ui"><div id="fishing-text">🎣 Закидываем удочку...</div><div id="fishing-timer">⏳ ...</div><button id="fishing-pull-btn" onclick="pullFish()">🎣 Тянуть!</button><button id="fishing-close-btn" onclick="closeFishing()">✖ Закрыть</button></div>
     <div id="tavern-ui">
         <div id="tavern-dialog">Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?</div>
-        <button class="tavern-btn" onclick="tavernAction('beer')" style="top:372px;">Выпить эль (10 кс)</button>
-        <button class="tavern-btn" onclick="tavernAction('dice')" style="top:419px;">Сыграть в кости</button>
-        <button class="tavern-btn" onclick="tavernAction('room')" style="top:466px;">Снять комнату (50 кс)</button>
-        <button class="tavern-btn" onclick="tavernAction('sell')" style="top:513px;">Продать рыбу</button>
+        <button class="tavern-btn" onclick="tavernAction('beer')" style="top:455px; left:1081px;">Выпить эль (10 кс)</button>
+        <button class="tavern-btn" onclick="tavernAction('dice')" style="top:502px; left:1081px;">Сыграть в кости</button>
+        <button class="tavern-btn" onclick="tavernAction('room')" style="top:549px; left:1081px;">Снять комнату (50 кс)</button>
+        <button class="tavern-btn" onclick="tavernAction('sell')" style="top:596px; left:1081px;">Продать рыбу</button>
         <div id="tavern-stats">💰 <span id="tavern-balance">0</span> кс &nbsp; ❤️ <span id="tavern-health">100</span>/100</div>
-        <button id="tavern-close" onclick="closeTavern()">Уйти из таверны</button>
+        <button id="tavern-close" onclick="closeTavern()" style="position:absolute; top:758px; left:580px; width:130px; height:32px; background:transparent; border:none; cursor:pointer; font-family:serif; font-size:14px; color:#8B1A00;">Уйти из таверны</button>
         <div id="tavern-sell-panel"></div>
     </div>
     <div id="dice-game"><div id="dice-inner"><h3>🎲 Кости</h3><div id="dice-result">🎲 🎲</div><div>Ставка: <input type="number" id="dice-bet" min="10" value="10" step="10"> кс</div><br><button class="dice-btn" onclick="rollDice()">Бросить</button><button class="dice-btn" onclick="closeDice()" style="background:#8B1A00;">Закрыть</button><div id="dice-outcome" style="margin-top:8px;font-weight:bold;"></div></div></div>
