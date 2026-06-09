@@ -192,8 +192,8 @@
             transform: translate(-50%, -50%) scale(1);
             z-index: 25;
             width: 1280px;
-            height: 800px;
-            background: url('/tavern.png') 100% 100% no-repeat;
+            height: 896px;
+            background: url('/tavern.png') center center / 100% 100% no-repeat;
             border: 3px solid #8B5E1A;
             border-radius: 12px;
             transform-origin: center;
@@ -218,7 +218,7 @@
         .tavern-btn:hover { background: #a0702a; color: white; }
         #tavern-close {
             position: absolute;
-            top: 758px;
+            top: 845px;
             left: 580px;
             width: 130px;
             height: 32px;
@@ -406,7 +406,7 @@
             <button class="tavern-btn" onclick="tavernAction('room')" style="top:466px; left:985px;">Снять комнату (50 кс)</button>
             <button class="tavern-btn" onclick="tavernAction('sell')" style="top:513px; left:985px;">Продать рыбу</button>
             <div id="tavern-stats">💰 <span id="tavern-balance">0</span> кс &nbsp; ❤️ <span id="tavern-health">100</span>/100</div>
-            <button id="tavern-close" onclick="closeTavern()" style="position:absolute; top:758px; left:580px;">Уйти из таверны</button>
+            <button id="tavern-close" onclick="closeTavern()" style="position:absolute; top:845px; left:580px;">Уйти из таверны</button>
             <div id="tavern-sell-panel"></div>
         </div>
 
@@ -542,7 +542,7 @@
         function updateTavernScale() {
             const scale = Math.min(
                 window.innerWidth / 1280,
-                window.innerHeight / 800,
+                window.innerHeight / 896,
                 1
             );
             DOM.tavernUI.style.transform = `translate(-50%, -50%) scale(${scale})`;
@@ -610,7 +610,7 @@
             updateTavernScale();
             DOM.tavernBalance.textContent = p?.balance || 0;
             DOM.tavernHealth.textContent = p?.health || 100;
-            DOM.tavernDialog.textContent = 'Добро пожаловать, путник! Что угодно?';
+            DOM.tavernDialog.textContent = 'Добро пожаловать в таверну "Пьяный Кусик"! Что тебе угодно, путник?';
             DOM.tavernSellPanel.style.display = 'none';
             DOM.tavernSellPanel.innerHTML = '';
         }
@@ -619,6 +619,8 @@
             tavernOpen = false;
             DOM.tavernUI.style.display = 'none';
             DOM.diceGame.style.display = 'none';
+            DOM.tavernSellPanel.style.display = 'none';
+            DOM.tavernSellPanel.innerHTML = '';
         }
 
         function tavernAction(action) {
@@ -635,18 +637,28 @@
                     socket.emit('tavernAction', { action: 'room' });
                     break;
                 case 'sell':
-                    const inv = p.inventory || [];
                     const panel = DOM.tavernSellPanel;
-                    if (inv.length === 0) {
+                    if (panel.style.display === 'block') {
+                        panel.style.display = 'none';
+                        return;
+                    }
+                    const inv = p.inventory || [];
+                    if (!inv.length) {
                         panel.innerHTML = '<p style="color:#aaa;">Инвентарь пуст.</p>';
                     } else {
-                        let h = '';
+                        let html = '';
                         inv.forEach((item, i) => {
-                            h += `<div class="sell-item"><span>${item.name}</span><span>${item.price} кс</span><button class="sell-btn" onclick="sellFish(${i})">Продать</button></div>`;
+                            html += `
+                                <div class="sell-item">
+                                    <span>${item.name}</span>
+                                    <span>${item.price} кс</span>
+                                    <button class="sell-btn" onclick="sellFish(${i})">Продать</button>
+                                </div>
+                            `;
                         });
-                        panel.innerHTML = h;
-                        panel.style.display = 'block';
+                        panel.innerHTML = html;
                     }
+                    panel.style.display = 'block';
                     break;
             }
         }
@@ -924,7 +936,6 @@
                     }
                 }
             }
-            // Чат обновляем только по событию
             const now = Date.now();
             chatMessages = chatMessages.filter(m => now - m.time < 8000);
             DOM.chatMessages.innerHTML = chatMessages.map(m =>
@@ -988,7 +999,7 @@
                     if (me && mapData) {
                         for (const b of mapData.buildings) {
                             if (me.x > b.x && me.x < b.x + b.w && me.y > b.y && me.y < b.y + b.h) {
-                                if (b.type === 'shop') openTavern();
+                                if (b.type === 'tavern') openTavern();
                                 break;
                             }
                         }
@@ -1001,7 +1012,11 @@
                 }
                 if (e.code === 'Enter') DOM.chatInput.focus();
                 if (e.code === 'KeyC') socket.emit('drinkCoffee');
-                if (e.code === 'Escape') closeFishing();
+                if (e.code === 'Escape') {
+                    closeFishing();
+                    closeTavern();
+                    closeDice();
+                }
             });
             document.addEventListener('keyup', e => { keys[e.code] = false; });
             DOM.chatInput.addEventListener('keydown', e => {
